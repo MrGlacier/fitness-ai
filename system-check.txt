@@ -1,0 +1,52 @@
+== System ==
+Linux archlinux 7.0.12-arch1-1 #1 SMP PREEMPT_DYNAMIC Wed, 10 Jun 2026 08:58:02 +0000 x86_64 GNU/Linux
+NAME="Arch Linux"
+PRETTY_NAME="Arch Linux"
+ID=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;23;147;209"
+== Updates/Pacman ==
+pacman 7.1.0.r9.g54d9411-2
+== GPU / NVIDIA ==
+Thu Jul  2 09:02:19 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 610.43.02              KMD Version: 610.43.02     CUDA UMD Version: 13.3     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 5070        Off |   00000000:09:00.0  On |                  N/A |
+|  0%   44C    P0             23W /  250W |     739MiB /  12227MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A             716      G   /usr/lib/Xorg                           384MiB |
+|    0   N/A  N/A           16827      G   ...share/Steam/ubuntu12_32/steam          4MiB |
+|    0   N/A  N/A           17047      G   ./steamwebhelper                         16MiB |
+|    0   N/A  N/A           17076    C+G   ...am/ubuntu12_64/steamwebhelper          7MiB |
+|    0   N/A  N/A          124357      G   ...rack-uuid=3190708988185955192        167MiB |
+|    0   N/A  N/A          146776      G   ...rack-uuid=3190708988185955192         48MiB |
++-----------------------------------------------------------------------------------------+
+== CUDA Compiler ==
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2026 NVIDIA Corporation
+Built on Fri_Apr_24_07:22:02_PM_PDT_2026
+Cuda compilation tools, release 13.3, V13.3.33
+Build cuda_13.3.r13.3/compiler.37862127_0
+== Python ==
+Python 3.14.6
+pip 26.1.2 from /usr/lib/python3.14/site-packages/pip (python 3.14)
+== Node / npm ==
+v26.4.0
+11.16.0
+== Git ==
+git version 2.55.0
+== llama.cpp ==
+/usr/bin/llama-server
+/usr/bin/llama-cli
