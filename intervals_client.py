@@ -5,12 +5,13 @@ from datetime import date, datetime, timedelta
 import httpx
 import config
 from utils import meters_to_km
-from models import Workout, Athlete
+from models import Workout, Athlete, TrainingZones
 
 from logger import logger
 
 intervals_icu_endpoints = {
     "athlete": "/athlete/{athlete_id}",
+    "sport-settings": "/athlete/{athlete_id}/sport-settings/{sport_type}",
     "activities": "/athlete/{athlete_id}/activities",
 }
 
@@ -51,13 +52,25 @@ class IntervalsClient:
         last_workout = self.get_workouts(from_date=from_date, to_date=to_date, sport_type=sport_type)
         return last_workout[0] if last_workout else None
 
-    def get_athlete_data(self) -> Athlete:
+
+    def get_athlete(self) -> Athlete:
         endpoint = intervals_icu_endpoints["athlete"].format(athlete_id=self.athlete_id)
         athlete = self._get(endpoint)
-        return self._map_athlete_data(athlete)
+        return self._map_athlete(athlete)
+
+
+    def get_training_zones(self, sport_type: str | None = None) -> list[TrainingZones]:
+        endpoint = intervals_icu_endpoints["sport-settings"].format(
+            athlete_id=self.athlete_id,
+            sport_type=sport_type or "",
+        )
+
+        training_zones = self._get(endpoint)
+        return self._map_training_zones(training_zones)
+
 
     def test_connection(self) -> dict:
-        athlete = self.get_athlete_data()
+        athlete = self.get_athlete()
         return {
             "success": True,
             "athlete": athlete
@@ -85,15 +98,43 @@ class IntervalsClient:
         )
     
     def _map_athlete(self, athlete_data: dict) -> Athlete:
-        #logger.info("Mapping data %s: (%s)", data.get("id"), data.get("name"))
-
         return Athlete(
             id=athlete_data["id"],
             name=athlete_data["name"],
             email=athlete_data["email"],
-            city=athlete_data["city"],
+            city=athlete_data.get("city"),
             timezone=athlete_data["timezone"],
         )
+    
+    def _map_training_zones(self, training_zones: dict | list) -> list[TrainingZones]:
+        training_zones_mapped = []
+        
+        if isinstance(training_zones, dict):
+            training_zones = [training_zones]
+
+        for training_zone in training_zones:
+            if "types" not in training_zone:
+                logger.info("Training zone without types: %s", training_zone.keys())
+
+            current_training_zone = TrainingZones(
+                types=training_zone.get("types", []),
+                ftp=training_zone.get("ftp"),
+                indoor_ftp=training_zone.get("indoor_ftp"),
+                lthr=training_zone.get("lthr"),
+                max_hr=training_zone.get("max_hr"),
+                threshold_pace=training_zone.get("threshold_pace"),
+                pace_units=training_zone.get("pace_units"),
+                power_zones=training_zone.get("power_zones"),
+                power_zone_names=training_zone.get("power_zone_names"),
+                hr_zones=training_zone.get("hr_zones"),
+                hr_zone_names=training_zone.get("hr_zone_names"),
+                pace_zones=training_zone.get("pace_zones"),
+                pace_zone_names=training_zone.get("pace_zone_names"),
+            )
+
+            training_zones_mapped.append(current_training_zone)
+        
+        return training_zones_mapped
     
     def _get(self, url: str, query_string: dict | None = None) -> dict | list:
         #logger.info(f"url: {url}, {query_string}")

@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from mcp.server.fastmcp import FastMCP
-from models import Workout
+from models import Workout, Athlete, TrainingZones
 
 import intervals_client
 from utils import meters_to_km
@@ -43,6 +43,11 @@ def get_workouts(
 def get_athlete() -> Athlete:
     """Liefert die Stammdaten des konfigurierten Intervals.icu-Athleten."""
     return intervals_client_instance.get_athlete()
+
+@mcp.tool()
+def get_training_zones(sport_type: str | None = None) -> list[TrainingZones]:
+    """Liefert Trainingszonen und Schwellenwerte des Athleten je Sportart."""
+    return intervals_client_instance.get_training_zones(sport_type)
 
 @mcp.tool()
 def test_intervals_connection() -> dict:
