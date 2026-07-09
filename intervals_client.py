@@ -64,7 +64,7 @@ class IntervalsClient:
             athlete_id=self.athlete_id,
             sport_type=sport_type or "",
         )
-
+        logger.info("get_training_zones - %s", endpoint)
         training_zones = self._get(endpoint)
         return self._map_training_zones(training_zones)
 

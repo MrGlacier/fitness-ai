@@ -4,12 +4,14 @@ from mcp.server.fastmcp import FastMCP
 from models import Workout, Athlete, TrainingZones
 
 import intervals_client
+import fitness_analyzer
 from utils import meters_to_km
 
 from logger import logger
 
 mcp = FastMCP("Fitness AI")
 intervals_client_instance = intervals_client.IntervalsClient()
+fitness_analyzer_instance = fitness_analyzer.FitnessAnalyzer(intervals_client_instance)
 
 @mcp.tool()
 def hello(name: str) -> str:
@@ -48,6 +50,11 @@ def get_athlete() -> Athlete:
 def get_training_zones(sport_type: str | None = None) -> list[TrainingZones]:
     """Liefert Trainingszonen und Schwellenwerte des Athleten je Sportart."""
     return intervals_client_instance.get_training_zones(sport_type)
+
+@mcp.tool()
+def get_current_ftp(sport_type: str  | None = None) -> dict:
+    """Liefert den aktuell hinterlegten FTP-Wert für eine Sportart, z. B. ride."""
+    return fitness_analyzer_instance.get_current_ftp(sport_type)
 
 @mcp.tool()
 def test_intervals_connection() -> dict:
