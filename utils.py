@@ -1,4 +1,4 @@
-def meters_to_km(meters: float) -> float:
+def meters_to_km(meters: float | None) -> float:
     if meters is None:
         return 0
 
