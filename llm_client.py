@@ -4,6 +4,7 @@
 import httpx
 
 import config
+import prompts
 from logger import logger
 
 llm_endpoints = {
@@ -21,6 +22,10 @@ class LlmClient:
             "model": "qwen",
             "messages": [
                 {
+                    "role": "system",
+                    "content": prompts.FITNESS_SYSTEM_PROMPT
+                },
+                {
                     "role": "user",
                     "content": "Hallo! Antworte nur mit: Verbindung erfolgreich."
                 }
@@ -28,13 +33,13 @@ class LlmClient:
             "temperature": 0
         }
 
-        logger.info("LLM ask hello %s", endpoint, post_data)
+        #logger.info("LLM ask hello %s - %s", endpoint, post_data)
 
         answer = self._post(endpoint, post_data)
         message_content = answer["choices"][0]["message"]["content"]
         return {
             "success": True,
-            "answer": message_content
+            "answer": message_content + " !"
         }
     
     def _post(self, url: str, post_data: dict | None = None) -> dict:
