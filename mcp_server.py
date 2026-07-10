@@ -74,3 +74,6 @@ def calculate_bmi(height: int, weight: float) -> float:
 def test_intervals_connection() -> dict:
     """Prüft die Verbindung zur Intervals.icu API und gibt den konfigurierten Athleten zurück."""
     return intervals_client_instance.test_connection()
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
