@@ -5,6 +5,8 @@ from models import Workout, Athlete, TrainingZones
 
 import intervals_client
 import fitness_analyzer
+import llm_client
+
 from utils import meters_to_km
 
 from logger import logger
@@ -12,18 +14,12 @@ from logger import logger
 mcp = FastMCP("Fitness AI")
 intervals_client_instance = intervals_client.IntervalsClient()
 fitness_analyzer_instance = fitness_analyzer.FitnessAnalyzer(intervals_client_instance)
+llm_client_instane = llm_client.LlmClient()
 
 @mcp.tool()
-def hello(name: str) -> str:
-    """Begrüßt eine Person."""
-    return f"Hallo {name}! 👋"
-
-@mcp.tool()
-def calculate_bmi(height: int, weight: float) -> float:
-    """Berechnet den Body-Mass-Index (BMI) anhand der Körpergröße in Zentimetern und des Gewichts in Kilogramm."""
-    height_m = height / 100
-    bmi = weight / (height_m ** 2)
-    return round(bmi, 2)
+def ask_llm_hello() -> dict:
+    """Testamfrage an die LLM um zu prüfen ob Sie verfügbar ist"""
+    return llm_client_instane.ask_for_hello();
 
 @mcp.tool()
 def get_last_workout(sport_type: str) -> Workout | None:
@@ -55,6 +51,18 @@ def get_training_zones(sport_type: str | None = None) -> list[TrainingZones]:
 def get_current_ftp(sport_type: str  | None = None) -> dict:
     """Liefert den aktuell hinterlegten FTP-Wert für eine Sportart, z. B. ride."""
     return fitness_analyzer_instance.get_current_ftp(sport_type)
+
+@mcp.tool()
+def hello(name: str) -> str:
+    """Begrüßt eine Person."""
+    return f"Hallo {name}! 👋"
+
+@mcp.tool()
+def calculate_bmi(height: int, weight: float) -> float:
+    """Berechnet den Body-Mass-Index (BMI) anhand der Körpergröße in Zentimetern und des Gewichts in Kilogramm."""
+    height_m = height / 100
+    bmi = weight / (height_m ** 2)
+    return round(bmi, 2)
 
 @mcp.tool()
 def test_intervals_connection() -> dict:

@@ -23,3 +23,11 @@ def get_intervals_icu_api_key() -> str:
 
 def get_intervals_icu_athlete_id() -> str:
     return os.getenv("INTERVALS_ICU_ATHLETE_ID")
+
+def get_llm_base_url() -> str:
+    base_url = os.getenv("LLM_BASE_URL")
+
+    if not base_url:
+        raise RuntimeError("LLM_BASE_URL fehlt in .env")
+    
+    return f"{base_url}"
