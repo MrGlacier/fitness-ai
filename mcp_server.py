@@ -17,9 +17,15 @@ fitness_analyzer_instance = fitness_analyzer.FitnessAnalyzer(intervals_client_in
 llm_client_instane = llm_client.LlmClient()
 
 @mcp.tool()
-def ask_llm_hello() -> dict:
+def ask_llm() -> dict:
     """Testamfrage an die LLM um zu prüfen ob Sie verfügbar ist"""
-    return llm_client_instane.ask_for_hello();
+    llm_client_instane.ask("Was ist FTP im Radsport?")
+    llm_client_instane.ask("Erkläre FTP so, dass es ein Anfänger versteht.")
+    llm_client_instane.ask("Wie hoch ist mein aktueller FTP?")
+    llm_client_instane.ask("Wenn dir ein Tool zum Abrufen meines FTP zur Verfügung stünde, wie würdest du vorgehen?")
+    return {
+        "success": True
+    }
 
 @mcp.tool()
 def get_last_workout(sport_type: str) -> Workout | None:

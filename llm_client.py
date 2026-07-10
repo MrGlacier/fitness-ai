@@ -14,9 +14,9 @@ llm_endpoints = {
 class LlmClient:
     def __init__(self, base_url: str | None = None):
         self.base_url = base_url or config.get_llm_base_url()
-        self.httpx_client = httpx.Client(base_url=self.base_url)
+        self.httpx_client = httpx.Client(base_url=self.base_url, timeout=None)
 
-    def ask_for_hello(self) -> dict:
+    def ask(self, question: str) -> dict:
         endpoint = llm_endpoints["completions"]
         post_data = {
             "model": "qwen",
@@ -27,19 +27,17 @@ class LlmClient:
                 },
                 {
                     "role": "user",
-                    "content": "Hallo! Antworte nur mit: Verbindung erfolgreich."
+                    "content": question
                 }
             ],
             "temperature": 0
         }
 
-        #logger.info("LLM ask hello %s - %s", endpoint, post_data)
-
         answer = self._post(endpoint, post_data)
-        message_content = answer["choices"][0]["message"]["content"]
+        answer_received = answer["choices"][0]["message"]["content"]
+        logger.info("LLM ask hello %s - %s - %s - %s", question, endpoint, post_data, answer_received)
         return {
             "success": True,
-            "answer": message_content + " !"
         }
     
     def _post(self, url: str, post_data: dict | None = None) -> dict:
