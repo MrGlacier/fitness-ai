@@ -1,4 +1,4 @@
-from logger import logger
+from core.logger import logger
 
 class FitnessAnalyzer:
     def __init__(self, intervals_client):

@@ -2,7 +2,7 @@
 
 import asyncio
 
-from mcp_client import McpClient
+from connectors.mcp_client import McpClient
 
 
 async def main():

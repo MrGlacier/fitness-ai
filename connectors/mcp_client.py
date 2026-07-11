@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from mcp import ClientSession, StdioServerParameters
+from connectors import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from logger import logger
+from core.logger import logger
 
 
 class McpClient:

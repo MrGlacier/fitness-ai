@@ -1,15 +1,15 @@
 from datetime import date, datetime
 
 from mcp.server.fastmcp import FastMCP
-from models import Workout, Athlete, TrainingZones
+from fitness.models import Workout, Athlete, TrainingZones
 
-import intervals_client
-import fitness_analyzer
-import llm_client
+from intervals import intervals_client
+from fitness import fitness_analyzer
+from llm import llm_client
 
-from utils import meters_to_km
+from core.utils import meters_to_km
 
-from logger import logger
+from core.logger import logger
 
 mcp = FastMCP("Fitness AI")
 intervals_client_instance = intervals_client.IntervalsClient()

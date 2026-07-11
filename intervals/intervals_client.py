@@ -3,11 +3,11 @@
 
 from datetime import date, datetime, timedelta
 import httpx
-import config
-from utils import meters_to_km
-from models import Workout, Athlete, TrainingZones
+from core import config
+from core.utils import meters_to_km
+from fitness.models import Workout, Athlete, TrainingZones
 
-from logger import logger
+from core.logger import logger
 
 intervals_icu_endpoints = {
     "athlete": "/athlete/{athlete_id}",

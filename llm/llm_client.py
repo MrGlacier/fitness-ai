@@ -3,9 +3,9 @@
 
 import httpx
 
-import config
-import prompts
-from logger import logger
+from core import config
+from llm import prompts
+from core.logger import logger
 
 llm_endpoints = {
     "completions": "v1/chat/completions",
