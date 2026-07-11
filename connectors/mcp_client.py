@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from connectors import ClientSession, StdioServerParameters
+from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from core.logger import logger
@@ -17,9 +17,10 @@ class McpClient:
             args=[
                 "run",
                 "python",
-                str(project_dir / "mcp_server.py"),
+                "-m",
+                "connectors.mcp_server",
             ],
-            cwd=str(project_dir),
+            cwd=str(project_dir.parent),
         )
 
     async def list_tools(self):

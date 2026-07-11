@@ -1,5 +1,3 @@
-# test_mcp_client.py
-
 import asyncio
 
 from connectors.mcp_client import McpClient

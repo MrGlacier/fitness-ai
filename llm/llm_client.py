@@ -38,6 +38,7 @@ class LlmClient:
         logger.info("LLM ask hello %s - %s - %s - %s", question, endpoint, post_data, answer_received)
         return {
             "success": True,
+            "answer": answer_received
         }
     
     def _post(self, url: str, post_data: dict | None = None) -> dict:
