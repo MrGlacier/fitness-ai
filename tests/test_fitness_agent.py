@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from fitness.fitness_agent import FitnessAgent
 from llm.llm_client import LlmClient
@@ -49,23 +50,32 @@ Stelle keine Rückfragen und führe das Tool nicht aus.
     question1 = "Wie hoch ist meine aktuelle FTP?"
     question = genereler_prompt.format(tools=tools_description, question=question1)
     answer1 = fa_client.answer(question)
+    # Extrahiere den Tool-Namen
+    # 1. Teile den String an der ersten Zeile auf
+    tool_line = answer1["answer"].splitlines()[0]
+    # 2. Teile die erste Zeile am Doppelpunkt und nimm den Teil danach
+    tool = tool_line.split(":", 1)[1].strip()
+    print("das tool ist: %s", tool)
+    ftp = await mcp_client.call_tool(tool, {})
+    print("Dein FTP ist: %s", json.loads(ftp.content[0].text)["ftp"])
 
-    question2 = "Zeige mir mein letztes Lauftraining."
-    question = genereler_prompt.format(tools=tools_description, question=question2)
-    answer2  = fa_client.answer(question)
 
-    question3 = "Welche Herzfrequenzzonen habe ich?"
-    question = genereler_prompt.format(tools=tools_description, question=question3)
-    answer3  = fa_client.answer(question)
+    #question2 = "Zeige mir mein letztes Lauftraining."
+    #question = genereler_prompt.format(tools=tools_description, question=question2)
+    #answer2  = fa_client.answer(question)
+#
+    #question3 = "Welche Herzfrequenzzonen habe ich?"
+    #question = genereler_prompt.format(tools=tools_description, question=question3)
+    #answer3  = fa_client.answer(question)
+#
+    #question4 = "Ich bin 170 cm groß und wiege 66 kg. Wie hoch ist mein BMI?"
+    #question = genereler_prompt.format(tools=tools_description, question=question4)
+    #answer4  = fa_client.answer(question)
 
-    question4 = "Ich bin 170 cm groß und wiege 66 kg. Wie hoch ist mein BMI?"
-    question = genereler_prompt.format(tools=tools_description, question=question4)
-    answer4  = fa_client.answer(question)
-
-    print(f"Frage1: {question1}: {answer1}")
-    print(f"Frage2: {question2}: {answer2}")
-    print(f"Frage3: {question3}: {answer3}")
-    print(f"Frage4: {question4}: {answer4}")
+    #print(f"Frage1: {question1}: {answer1}")
+    #print(f"Frage2: {question2}: {answer2}")
+    #print(f"Frage3: {question3}: {answer3}")
+    #print(f"Frage4: {question4}: {answer4}")
 
 
 def build_tool_description(tool_list):
