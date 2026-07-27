@@ -19,7 +19,7 @@ async def main():
             "beschreibung": tool.description
         })
 
-    genereler_prompt = """Du bist ein Tool-Planer für eine Fitness-Anwendung.\
+    genereler_prompt = """Du bist ein Tool-Planer für eine Fitness-Anwendung.
 
 Deine Aufgabe ist noch nicht, die Benutzerfrage fachlich zu beantworten.
 

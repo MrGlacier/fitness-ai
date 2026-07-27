@@ -1,10 +1,11 @@
 from datetime import date, datetime
 
 from mcp.server.fastmcp import FastMCP
+from connectors.mcp_client import McpClient
 from fitness.models import Workout, Athlete, TrainingZones
 
 from intervals import intervals_client
-from fitness import fitness_analyzer
+from fitness import fitness_analyzer, fitness_agent
 from llm import llm_client
 
 from core.utils import meters_to_km
@@ -12,17 +13,21 @@ from core.utils import meters_to_km
 from core.logger import logger
 
 mcp = FastMCP("Fitness AI")
+mcp_client_instance = McpClient()
+
 intervals_client_instance = intervals_client.IntervalsClient()
 fitness_analyzer_instance = fitness_analyzer.FitnessAnalyzer(intervals_client_instance)
-llm_client_instane = llm_client.LlmClient()
+llm_client_instance = llm_client.LlmClient()
+fitness_agend = fitness_agent.FitnessAgent(llm_client_instance, mcp_client_instance)
 
 @mcp.tool()
-def ask_llm() -> dict:
+async def ask_llm() -> dict:
     """Testamfrage an die LLM um zu prüfen ob Sie verfügbar ist"""
-    llm_client_instane.ask("Was ist FTP im Radsport?")
-    llm_client_instane.ask("Erkläre FTP so, dass es ein Anfänger versteht.")
-    llm_client_instane.ask("Wie hoch ist mein aktueller FTP?")
-    llm_client_instane.ask("Wenn dir ein Tool zum Abrufen meines FTP zur Verfügung stünde, wie würdest du vorgehen?")
+    logger.info("ask_llm calling...?")
+    await fitness_agend.ask("Wie hoch ist meine aktuelle FTP?")
+    #llm_client_instane.ask("Erkläre FTP so, dass es ein Anfänger versteht.")
+    #llm_client_instane.ask("Wie hoch ist mein aktueller FTP?")
+    #llm_client_instane.ask("Wenn dir ein Tool zum Abrufen meines FTP zur Verfügung stünde, wie würdest du vorgehen?")
     return {
         "success": True
     }
