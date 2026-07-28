@@ -49,28 +49,20 @@ class FitnessAgent:
         """
 
     async def ask(self, question: str) -> dict:
-        logger.info("ask? - %s", question)
-
         tools_description = await self.build_tools_description_for_llm()
-        logger.info("ask::tools_description - %s", tools_description)
-
-        logger.info("ask::prompt - %s", self.prompt)
-
         generated_question = self.prompt.format(tools=tools_description, question=question)
-        logger.info("ask::generated_question %s", generated_question)
-
         answer = self.llm_client_instance.ask(question=generated_question)
-        logger.info("ask::answer %s", answer)
-        # Extrahiere den Tool-Namen
-        # 1. Teile den String an der ersten Zeile auf
-        #tool_line = answer["answer"].splitlines()[0]
-        # 2. Teile die erste Zeile am Doppelpunkt und nimm den Teil danach
-        #tool = tool_line.split(":", 1)[1].strip()
-        #logger.info("tool %s", tool)
+        clean_string = answer["answer"].replace("json", "").replace("`", "")
+        parsed_json = json.loads(clean_string)
 
-        #ftp = await self.mcp_client_instance.call_tool(tool, {})
-        #logger.info("aks::Dein FTP ist: %s", json.loads(ftp.content[0].text)["ftp"])
-        return []
+        if parsed_json["status"] == "found":
+            tool_answer = await self.mcp_client_instance.call_tool(parsed_json["tool"], {})
+            value = json.loads(tool_answer.content[0].text)["ftp"]
+
+            if value:
+                return value
+
+        return f"Für die Frage '{question}' konnte kein passendes Tool gefunden werden."
         
     def answer(self, question: str) -> dict:
         logger.info("answer? - %s", question)
