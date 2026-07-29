@@ -9,7 +9,8 @@ async def main():
     llm_client = LlmClient()
     fitness_agent = FitnessAgent(llm_client_instance=llm_client, mcp_client_instance=mcp_client)
 
-    question = "Wie hoch ist mein FTP?"
+    #question = "Wie hoch ist mein FTP?"
+    question = "Wie war mein letztes Lauftraining?"
     answer = await fitness_agent.ask(question)
     print(f"Antwort auf '{question}' ist '{answer}'")
 

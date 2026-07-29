@@ -35,7 +35,7 @@ class LlmClient:
 
         answer = self._post(endpoint, post_data)
         answer_received = answer["choices"][0]["message"]["content"]
-        logger.info("LLM ask hello %s - %s - %s - %s", question, endpoint, post_data, answer_received)
+
         return {
             "success": True,
             "answer": answer_received

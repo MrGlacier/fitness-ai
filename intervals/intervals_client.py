@@ -36,7 +36,7 @@ class IntervalsClient:
         data = self._get(endpoint, query_string)
         if sport_type:
             # [Ergebnis for Element in Sammlung if Bedingung]
-            data = [activity for activity in data if activity.get("type") == sport_type]
+            data = [activity for activity in data if activity.get("type").lower() == sport_type.lower()]
         
         results = []
         for activity in data:
@@ -60,6 +60,9 @@ class IntervalsClient:
 
 
     def get_training_zones(self, sport_type: str | None = None) -> list[TrainingZones]:
+        if sport_type:
+            sport_type = sport_type[0].upper() + sport_type[1:]
+            
         endpoint = intervals_icu_endpoints["sport-settings"].format(
             athlete_id=self.athlete_id,
             sport_type=sport_type or "",
