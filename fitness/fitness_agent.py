@@ -78,10 +78,9 @@ class FitnessAgent:
 
         if parsed_json["status"] == "found":
             tool_answer = await self.mcp_client_instance.call_tool(parsed_json["tool"], {})
-            value = json.loads(tool_answer.content[0].text)["ftp"]
-
-            if value:
-                return self.__generate_answer(pre_question=question, pre_answer=value)
+            tool_result = json.loads(tool_answer.content[0].text)
+            if tool_result:
+                return self.__generate_answer(pre_question=question, tool_result=tool_result)
 
         return f"Für die Frage '{question}' konnte kein passendes Tool gefunden werden."
         
@@ -89,8 +88,8 @@ class FitnessAgent:
         logger.info("answer? - %s", question)
         return []
 
-    def __generate_answer(self, pre_question: str, pre_answer: str):
-        generated_question = self.answer_prompt.format(question=pre_question, tool_result=pre_answer)
+    def __generate_answer(self, pre_question: str, tool_result: dict[str, object]):
+        generated_question = self.answer_prompt.format(question=pre_question, tool_result=tool_result)
         answer = self.llm_client_instance.ask(question=generated_question)
         return answer["answer"]
 
