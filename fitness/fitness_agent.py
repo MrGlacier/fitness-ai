@@ -11,7 +11,7 @@ class FitnessAgent:
         logger.info("FitnessAgent::init called")
         self.llm_client_instance = llm_client_instance
         self.mcp_client_instance = mcp_client_instance
-        self.prompt = """Du bist ein Tool-Planer für eine Fitness-Anwendung.\
+        self.ask_for_tool_prompt = """Du bist ein Tool-Planer für eine Fitness-Anwendung.\
         
         Deine Aufgabe ist noch nicht, die Benutzerfrage fachlich zu beantworten.
         
@@ -48,9 +48,30 @@ class FitnessAgent:
         Stelle keine Rückfragen und führe das Tool nicht aus.
         """
 
+        self.answer_prompt = """
+            Du bist ein erfahrener Triathlon- und Laufcoach.
+
+            Ein Fitness-Tool hat bereits die benötigten Daten geliefert.
+            Deine Aufgabe ist es, dem Athleten das Ergebnis verständlich zu erklären.
+
+            Regeln:
+            - Nutze ausschließlich die bereitgestellten Daten.
+            - Erfinde keine zusätzlichen Werte oder Fakten.
+            - Antworte in maximal 3 kurzen Sätzen.
+            - Antworte freundlich und motivierend.
+
+            Frage des Athleten:
+            {question}
+
+            Ergebnis des Fitness-Tools:
+            {tool_result}
+
+            Antwort:
+            """ 
+
     async def ask(self, question: str) -> dict:
         tools_description = await self.build_tools_description_for_llm()
-        generated_question = self.prompt.format(tools=tools_description, question=question)
+        generated_question = self.ask_for_tool_prompt.format(tools=tools_description, question=question)
         answer = self.llm_client_instance.ask(question=generated_question)
         clean_string = answer["answer"].replace("json", "").replace("`", "")
         parsed_json = json.loads(clean_string)
@@ -60,13 +81,18 @@ class FitnessAgent:
             value = json.loads(tool_answer.content[0].text)["ftp"]
 
             if value:
-                return value
+                return self.__generate_answer(pre_question=question, pre_answer=value)
 
         return f"Für die Frage '{question}' konnte kein passendes Tool gefunden werden."
         
     def answer(self, question: str) -> dict:
         logger.info("answer? - %s", question)
         return []
+
+    def __generate_answer(self, pre_question: str, pre_answer: str):
+        generated_question = self.answer_prompt.format(question=pre_question, tool_result=pre_answer)
+        answer = self.llm_client_instance.ask(question=generated_question)
+        return answer["answer"]
 
     async def build_tools_description_for_llm(self):
         tools = await self.mcp_client_instance.list_tools()
