@@ -7,12 +7,12 @@ async def main():
     mcp_client = McpClient()
     tools = await mcp_client.list_tools()
     for tool in tools.tools:
-        print(tool.name)
+        print(f"{tool.name}: '{tool.description}'")
         
     result = await mcp_client.call_tool(
         "get_recent_workouts",
         {
-            "days": 7,
+            "days": 30,
             #"sport_type": "Ride"
         },
     )

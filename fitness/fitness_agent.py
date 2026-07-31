@@ -106,16 +106,21 @@ class FitnessAgent:
         tools_json = json.loads(tools_answer_string)
         
         if tools_json["status"] == "found":
-            arguments = tools_json["arguments"]
-            if not arguments:
-                arguments = ""
+            tool_arguments = tools_json["arguments"]
+            if not tool_arguments:
+                tool_arguments = ""
 
-            tool_answer = await self.mcp_client_instance.call_tool(tools_json["tool"], arguments)
-            if tool_answer.content[0].text:
+            tool_name = tools_json["tool"]
+            tool_answer = await self.mcp_client_instance.call_tool(tool_name, tool_arguments)
+            if tool_answer.structuredContent is not None:
+                tool_result = tool_answer.structuredContent.get("result")
+            elif tool_answer.content and tool_answer.content[0].text:
                 tool_result = json.loads(tool_answer.content[0].text)
+            else:
+                tool_result = None
 
             if tool_result:
-                return self.__generate_answer(pre_question=question, tool_name=tools_json["tool"], tool_arguments=arguments, tool_description=tools_json["description"], tool_result=tool_result)
+                return self.__generate_answer(pre_question=question, tool_name=tools_json["tool"], tool_arguments=tool_arguments, tool_description=tools_json["description"], tool_result=tool_result)
 
         return f"Für die Frage '{question}' konnte kein passendes Tool gefunden werden."
         
@@ -134,7 +139,8 @@ class FitnessAgent:
         for tool in tools.tools:
             tools_description.append({
                 "name": tool.name,
-                "beschreibung": tool.description
+                "argumente": tool.inputSchema,
+                "beschreibung": tool.description,
             })
 
         return tools_description

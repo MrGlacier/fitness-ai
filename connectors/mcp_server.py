@@ -21,17 +21,15 @@ def get_workouts(
     to_date: date | None = None,
     sport_type: str | None = None
 ) -> list[Workout]:
-    """Liefert alle abgeschlossenen Workouts innerhalb eines Datumsbereichs. Optional kann nach einer Sportart (z. B. run, ride oder swim) gefiltert werden."""
+    """Liefert Trainings zwischen zwei konkreten Datumswerten. Verwende dieses Tool nur, wenn Start- und Enddatum als echte Datumswerte bekannt sind."""
     from_date = from_date or date.today()
     to_date = to_date or date.today()
     return intervals_client_instance.get_workouts(from_date, to_date, sport_type)
 
 @mcp.tool()
 def get_recent_workouts(days: int, sport_type: str | None = None) -> list[Workout]:
-    """Liefert alle abgeschlossenen Trainings der letzten X Tage. Optional kann nach einer Sportart wie run, ride oder swim gefiltert werden."""
-    from_date = date.today() - timedelta(days=days)
-    to_date = date.today()
-    return intervals_client_instance.get_workouts(from_date, to_date, sport_type)
+    """Liefert Trainings aus einem relativen Zeitraum, zum Beispiel aus den letzten 7, 14 oder 30 Tagen. Verwende dieses Tool bei Formulierungen wie „letzte Woche“, „letzte 30 Tage“ oder „im letzten Monat“."""
+    return intervals_client_instance.get_recent_workouts(days, sport_type)
 
 @mcp.tool()
 def get_athlete() -> Athlete:
