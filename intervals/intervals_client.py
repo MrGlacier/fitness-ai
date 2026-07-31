@@ -53,6 +53,24 @@ class IntervalsClient:
         return last_workout[0] if last_workout else None
 
 
+    def get_recent_workouts(self, days: int, sport_type: str | None = None) -> list[Workout]:
+        endpoint = intervals_icu_endpoints["activities"].format(athlete_id=self.athlete_id)
+        query_string = {"oldest": date.today() - timedelta(days=days)}
+        query_string["newest"] = date.today()
+
+        data = self._get(endpoint, query_string)
+        if sport_type:
+                    # [Ergebnis for Element in Sammlung if Bedingung]
+                    data = [activity for activity in data if activity.get("type").lower() == sport_type.lower()]
+
+        results = []
+        for activity in data:
+            converted_activity = self._map_activity_to_workout(activity)
+            results.append(converted_activity)
+
+        return results
+
+
     def get_athlete(self) -> Athlete:
         endpoint = intervals_icu_endpoints["athlete"].format(athlete_id=self.athlete_id)
         athlete = self._get(endpoint)

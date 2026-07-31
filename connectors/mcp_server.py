@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from mcp.server.fastmcp import FastMCP
 from fitness.models import Workout, Athlete, TrainingZones
@@ -24,6 +24,13 @@ def get_workouts(
     """Liefert alle abgeschlossenen Workouts innerhalb eines Datumsbereichs. Optional kann nach einer Sportart (z. B. run, ride oder swim) gefiltert werden."""
     from_date = from_date or date.today()
     to_date = to_date or date.today()
+    return intervals_client_instance.get_workouts(from_date, to_date, sport_type)
+
+@mcp.tool()
+def get_recent_workouts(days: int, sport_type: str | None = None) -> list[Workout]:
+    """Liefert alle abgeschlossenen Trainings der letzten X Tage. Optional kann nach einer Sportart wie run, ride oder swim gefiltert werden."""
+    from_date = date.today() - timedelta(days=days)
+    to_date = date.today()
     return intervals_client_instance.get_workouts(from_date, to_date, sport_type)
 
 @mcp.tool()
