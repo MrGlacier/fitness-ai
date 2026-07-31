@@ -12,7 +12,9 @@ async def main():
     #question = "Wie hoch ist mein FTP?"
     #question = "Wie war mein letztes Lauftraining?"
     #question = "Wie war mein letztes Training?"
-    question = "An welchem Wochentag trainiere ich in den letzten 30 Tagen am häufigsten?"
+    #question = "An welchem Wochentag trainiere ich in den letzten 30 Tagen am häufigsten?"
+    #question = "Anhand meiner aktuellen FTP und meiner Trainings der letzten 7 Tage schlage mir die nächste Radeinheit vor."
+    question="Vergleiche meine Lauf- und Radtrainings der letzten 14 Tage und sage mir, welche Disziplin ich zuletzt stärker trainiert habe."
     answer = await fitness_agent.ask(question)
     print(f"Antwort auf '{question}' ist '{answer}'")
 
