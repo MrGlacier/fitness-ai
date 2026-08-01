@@ -23,7 +23,10 @@ PYTHONPATH=. uv run python -m main "Wie hoch ist mein FTP?"
     # sys.argv[0] ist der Skriptname, sys.argv[1] ist das erste Argument
     for question in sys.argv[1:]:
         answer = await fitness_agent.ask(question)
-        print(f"Antwort auf '{question}' ist '{answer}'")
+        print(f"""Antwort auf die Frage
+'{question}'
+
+'{answer}'""")
 
 
 if __name__ == "__main__":

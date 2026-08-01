@@ -16,14 +16,14 @@ class LlmClient:
         self.base_url = base_url or config.get_llm_base_url()
         self.httpx_client = httpx.Client(base_url=self.base_url, timeout=None)
 
-    def ask(self, question: str) -> dict:
+    def ask(self, question: str, system_prompt=None) -> dict:
         endpoint = llm_endpoints["completions"]
         post_data = {
             "model": "qwen",
             "messages": [
                 {
                     "role": "system",
-                    "content": prompts.FITNESS_SYSTEM_PROMPT
+                    "content": system_prompt if system_prompt else prompts.FITNESS_SYSTEM_PROMPT
                 },
                 {
                     "role": "user",

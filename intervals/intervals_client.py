@@ -46,11 +46,20 @@ class IntervalsClient:
         return results
     
 
-    def get_last_workout(self, sport_type: str) -> Workout | None:
+    def get_last_workout(self, sport_type: str | None = None) -> Workout | None:
         from_date = date.today() - timedelta(days=30)
         to_date = date.today()
-        last_workout = self.get_workouts(from_date=from_date, to_date=to_date, sport_type=sport_type)
-        return last_workout[0] if last_workout else None
+
+        workouts = self.get_workouts(
+            from_date=from_date,
+            to_date=to_date,
+            sport_type=sport_type,
+        )
+
+        if not workouts:
+            return None
+
+        return max(workouts, key=lambda workout: workout.start_time)
 
 
     def get_recent_workouts(self, days: int, sport_type: str | None = None) -> list[Workout]:
@@ -60,8 +69,8 @@ class IntervalsClient:
 
         data = self._get(endpoint, query_string)
         if sport_type:
-                    # [Ergebnis for Element in Sammlung if Bedingung]
-                    data = [activity for activity in data if activity.get("type").lower() == sport_type.lower()]
+            # [Ergebnis for Element in Sammlung if Bedingung]
+            data = [activity for activity in data if activity.get("type").lower() == sport_type.lower()]
 
         results = []
         for activity in data:
