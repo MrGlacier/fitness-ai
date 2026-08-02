@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 class Workout(BaseModel):
@@ -11,6 +11,12 @@ class Workout(BaseModel):
     avg_hr: int | None = None
     tss: float | None = None
     intensity: float | None = None
+    max_hr: int | None = None
+    average_cadence: float | None = None
+    elevation_gain: float | None = None
+    decoupling: float | None = None
+    weighted_avg_watts: float | None = None
+    variability_index: float | None = None
 
 class TrainingZones(BaseModel):
     types: list[str] = Field(default_factory=list)
@@ -33,4 +39,14 @@ class Athlete(BaseModel):
     city: str | None = None
     email: str
     timezone: str
-    
+
+class TrainingStatus(BaseModel):
+    date: date
+    ctl: float | None = None
+    atl: float | None = None
+    form: float | None = None
+    form_status: str | None = None
+    summary: str | None = None
+    resting_hr: int | None = None
+    hrv: float | None = None
+    sleep_secs: int | None = None

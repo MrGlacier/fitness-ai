@@ -1,7 +1,7 @@
-from datetime import date, timedelta
+from datetime import date
 
 from mcp.server.fastmcp import FastMCP
-from fitness.models import Workout, Athlete, TrainingZones
+from fitness.models import Workout, Athlete, TrainingZones, TrainingStatus
 from intervals import intervals_client
 from fitness import fitness_analyzer
 
@@ -45,6 +45,12 @@ def get_training_zones(sport_type: str | None = None) -> list[TrainingZones]:
 def get_current_ftp(sport_type: str  | None = None) -> dict:
     """Liefert den aktuell hinterlegten FTP-Wert für eine Sportart, z. B. ride."""
     return fitness_analyzer_instance.get_current_ftp(sport_type)
+
+@mcp.tool()
+def get_current_training_status(for_date: date | None = None) -> TrainingStatus | None:
+    """Liefert den aktuellen Trainings- und Erholungsstatus des Athleten mit Fitness, Ermüdung, Form, Ruhepuls, HRV, Schlaf und subjektivem Befinden."""
+    for_date = for_date or date.today()
+    return fitness_analyzer_instance.get_current_training_status(for_date)
 
 @mcp.tool()
 def hello(name: str) -> str:

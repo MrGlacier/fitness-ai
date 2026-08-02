@@ -164,6 +164,15 @@ Antwort:
         self.coach_answer_prompt = """
 Du bist ein erfahrener Triathlon- und Ausdauertrainer.
 
+Die Tool-Ergebnisse wurden bereits fachlich vom FitnessAnalyzer aufbereitet.
+
+Wenn Felder wie "summary" oder "form_status" vorhanden sind, verwende diese als fachliche Grundlage.
+
+Interpretiere CTL, ATL und form nicht erneut.
+Erfinde keine eigenen Schwellenwerte oder zusätzlichen Zusammenhänge.
+
+Deine Aufgabe ist nur, die vorhandenen Informationen verständlich zu formulieren.
+
 Du erhältst:
 
 - die ursprüngliche Frage des Athleten
@@ -171,7 +180,7 @@ Du erhältst:
 - die Argumente der Tools
 - die Ergebnisse der Tools
 
-Deine Aufgabe ist es, die vorhandenen Trainingsdaten fachlich zu interpretieren und daraus eine verständliche, sinnvolle und vorsichtige Empfehlung abzuleiten.
+Deine Aufgabe ist es, die bereits fachlich aufbereiteten Trainingsdaten verständlich zu erklären und nur dann eine vorsichtige Empfehlung abzuleiten, wenn diese durch die Tool-Ergebnisse ausreichend begründet ist.
 
 Regeln:
 
@@ -279,6 +288,7 @@ Antwort:
         else:
             answer_prompt = self.data_answer_prompt
 
+        logger.info("Tool results for answer prompt: %s", tool_results)
         generated_question = answer_prompt.format(
             pre_question=pre_question,
             tool_results=tool_results_json,

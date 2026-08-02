@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import httpx
 from core import config
 from core.utils import meters_to_km
-from fitness.models import Workout, Athlete, TrainingZones
+from fitness.models import Workout, Athlete, TrainingZones, TrainingStatus
 
 from core.logger import logger
 
@@ -13,6 +13,7 @@ intervals_icu_endpoints = {
     "athlete": "/athlete/{athlete_id}",
     "sport-settings": "/athlete/{athlete_id}/sport-settings/{sport_type}",
     "activities": "/athlete/{athlete_id}/activities",
+    "training-status": "/athlete/{athlete_id}/wellness/{for_date}",
 }
 
 class IntervalsClient:
@@ -94,9 +95,19 @@ class IntervalsClient:
             athlete_id=self.athlete_id,
             sport_type=sport_type or "",
         )
-        logger.info("get_training_zones - %s", endpoint)
+        #logger.info("get_training_zones - %s", endpoint)
         training_zones = self._get(endpoint)
         return self._map_training_zones(training_zones)
+
+
+    def get_current_training_status(self, for_date: date) -> TrainingStatus:
+        endpoint = intervals_icu_endpoints["training-status"].format(
+            athlete_id=self.athlete_id,
+            for_date=for_date,
+        )
+
+        current_training_status = self._get(endpoint)
+        return self._map_training_status(current_training_status)
 
 
     def test_connection(self) -> dict:
@@ -114,17 +125,28 @@ class IntervalsClient:
 
         distance = activity.get("distance")
         intensity = activity.get("icu_intensity")
+        average_cadence = activity.get("average_cadence")
+        elevation_gain = activity.get("total_elevation_gain")
+        decoupling = activity.get("decoupling")
+        weighted_avg_watts = activity.get("icu_weighted_avg_watts")
+        variability_index = activity.get("icu_variability_index")
 
         return Workout(
-            id=activity["id"],
-            name=activity["name"],
-            start_time=datetime.fromisoformat(start_date),
-            sport=activity["type"],
-            distance_km=meters_to_km(distance) if distance is not None else 0.0,
-            duration_sec=activity["moving_time"],
-            avg_hr=activity.get("average_heartrate"),
-            tss=activity.get("icu_training_load"),
-            intensity=round(intensity, 2) if intensity is not None else None,
+            id = activity["id"],
+            name = activity["name"],
+            start_time = datetime.fromisoformat(start_date),
+            sport = activity["type"],
+            distance_km = meters_to_km(distance) if distance is not None else 0.0,
+            duration_sec = activity["moving_time"],
+            avg_hr = activity.get("average_heartrate"),
+            tss = activity.get("icu_training_load"),
+            intensity = round(intensity, 2) if intensity is not None else None,
+            max_hr = activity.get("max_heartrate"),
+            average_cadence = round(average_cadence, 1) if average_cadence is not None else None,
+            elevation_gain = round(elevation_gain, 1) if elevation_gain is not None else None,
+            decoupling = round(decoupling, 2) if decoupling is not None else None,
+            weighted_avg_watts = round(weighted_avg_watts, 1) if weighted_avg_watts is not None else None,
+            variability_index = (round(variability_index, 2) if variability_index is not None else None)
         )
     
     def _map_athlete(self, athlete_data: dict) -> Athlete:
@@ -165,6 +187,23 @@ class IntervalsClient:
             training_zones_mapped.append(current_training_zone)
         
         return training_zones_mapped
+
+    def _map_training_status(self, traing_status: list) -> TrainingStatus:
+        #logger.info(f"_map_training_status: %s", traing_status)
+
+        return TrainingStatus(
+            date=date.fromisoformat(traing_status.get("id")),
+            ctl=round(traing_status.get("ctl"), 2)
+            if traing_status.get("ctl") is not None else None,
+            atl=round(traing_status.get("atl"), 2)
+            if traing_status.get("atl") is not None else None,
+            form=traing_status.get("form"),
+            form_status=traing_status.get("form_status"),
+            summary=traing_status.get("summary"),
+            resting_hr=traing_status.get("restingHR"),
+            hrv=round(traing_status.get("hrv"), 2) if traing_status.get("hrv") is not None else None,
+            sleep_secs=traing_status.get("sleepSecs"),
+        )
     
     def _get(self, url: str, query_string: dict | None = None) -> dict | list:
         #logger.info(f"url: {url}, {query_string}")
