@@ -10,6 +10,7 @@ class Workout(BaseModel):
     duration_sec: int
     avg_hr: int | None = None
     tss: float | None = None
+    intensity: float | None = None
 
 class TrainingZones(BaseModel):
     types: list[str] = Field(default_factory=list)

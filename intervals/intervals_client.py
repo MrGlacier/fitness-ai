@@ -108,13 +108,12 @@ class IntervalsClient:
         
 
     def _map_activity_to_workout(self, activity: dict) -> Workout:
-        #logger.info("Mapping activity %s (%s)", activity.get("id"), activity.get("name"))
-
         start_date = activity.get("start_date")
         if start_date is None:
             raise ValueError(f"Activity {activity.get('id')} has no start_date")
 
         distance = activity.get("distance")
+        intensity = activity.get("icu_intensity")
 
         return Workout(
             id=activity["id"],
@@ -125,6 +124,7 @@ class IntervalsClient:
             duration_sec=activity["moving_time"],
             avg_hr=activity.get("average_heartrate"),
             tss=activity.get("icu_training_load"),
+            intensity=round(intensity, 2) if intensity is not None else None,
         )
     
     def _map_athlete(self, athlete_data: dict) -> Athlete:
