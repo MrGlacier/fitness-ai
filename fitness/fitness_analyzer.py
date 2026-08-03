@@ -1,6 +1,6 @@
 from datetime import date
 
-from fitness.models import TrainingStatus
+from fitness.models import Workout, TrainingStatus
 
 from core.logger import logger
 
@@ -56,4 +56,130 @@ class FitnessAnalyzer:
             training_status.summary = "Du befindest dich aktuell in einer sehr hohen Belastungsphase. Erholung ist dringend zu empfehlen."
 
         return training_status
+
+    def get_last_workout(self, sport_type: str) -> Workout | None:
+        workout = self.intervals_client_instance.get_last_workout(sport_type)
+
+        if workout is None:
+            return None
+
+        if workout.sport == "Run":
+            if (
+                workout.duration_sec >= 5300
+                and workout.intensity is not None
+                and workout.intensity < 80
+                and workout.decoupling is not None
+                and workout.decoupling < 5
+            ):
+                workout.workout_summary = (
+                    "Langer und sehr gleichmäßig absolvierter Lauf mit moderater Intensität. "
+                    "Die geringe aerobe Entkopplung spricht für eine stabile "
+                    "Belastungsverträglichkeit über die Dauer der Einheit."
+                )
+
+            elif workout.intensity is not None and workout.intensity >= 85:
+                workout.workout_summary = (
+                    "Intensiver Lauf mit hoher relativer Belastung."
+                )
+
+            elif (
+                workout.variability_index is not None
+                and workout.variability_index <= 1.05
+            ):
+                workout.workout_summary = (
+                    "Gleichmäßig absolvierter Lauf mit moderater relativer Belastung."
+                )
+
+            else:
+                workout.workout_summary = (
+                    "Laufeinheit mit moderater relativer Belastung."
+                )
+
+        elif workout.sport == "Ride":
+            if (
+                workout.duration_sec >= 7200
+                and workout.intensity is not None
+                and workout.intensity < 75
+                and workout.decoupling is not None
+                and workout.decoupling < 5
+            ):
+                workout.workout_summary = (
+                    "Lange und kontrolliert absolvierte Radeinheit mit moderater Intensität. "
+                    "Die geringe aerobe Entkopplung spricht für eine stabile "
+                    "Belastungsverträglichkeit über die Dauer der Einheit."
+                )
+
+            elif workout.intensity is not None and workout.intensity >= 85:
+                workout.workout_summary = (
+                    "Intensive Radeinheit mit hoher relativer Belastung."
+                )
+
+            elif (
+                workout.variability_index is not None
+                and workout.variability_index <= 1.05
+            ):
+                workout.workout_summary = (
+                    "Sehr gleichmäßig absolvierte Radeinheit mit moderater relativer Belastung."
+                )
+
+            elif (
+                workout.variability_index is not None
+                and workout.variability_index >= 1.15
+            ):
+                workout.workout_summary = (
+                    "Unruhig gefahrene Radeinheit mit vielen Belastungsschwankungen."
+                )
+
+            else:
+                workout.workout_summary = (
+                    "Radeinheit mit moderater relativer Belastung."
+                )
+
+        if workout.rpe is not None:
+            if (
+                workout.intensity is not None
+                and workout.intensity < 80
+                and workout.rpe >= 7
+            ):
+                workout.workout_summary += (
+                    f" Trotz der moderaten objektiven Intensität wurde die Einheit "
+                    f"subjektiv mit RPE {workout.rpe} als deutlich anstrengend erlebt. "
+                    "Die subjektive Belastung war damit höher, als die Messwerte allein vermuten lassen."
+                )
+
+            elif (
+                workout.intensity is not None
+                and workout.intensity >= 85
+                and workout.rpe <= 4
+            ):
+                workout.workout_summary += (
+                    f" Trotz der hohen objektiven Intensität wurde die Einheit "
+                    f"subjektiv mit RPE {workout.rpe} als vergleichsweise leicht erlebt. "
+                    "Die Belastung wurde offenbar gut vertragen."
+                )
+
+            elif workout.rpe >= 8:
+                workout.workout_summary += (
+                    f" Subjektiv wurde die Einheit mit RPE {workout.rpe} "
+                    "als sehr anstrengend bewertet."
+                )
+
+            elif workout.rpe >= 6:
+                workout.workout_summary += (
+                    f" Subjektiv wurde die Einheit mit RPE {workout.rpe} "
+                    "als anstrengend bewertet."
+                )
+
+            elif workout.rpe <= 3:
+                workout.workout_summary += (
+                    f" Subjektiv wurde die Einheit mit RPE {workout.rpe} "
+                    "als leicht bewertet."
+                )
+
+        if workout.comment:
+            workout.workout_summary += (
+                f' Der Athlet beschreibt die Einheit so: "{workout.comment.strip()}"'
+            )
+
+        return workout
 

@@ -17,6 +17,9 @@ class Workout(BaseModel):
     decoupling: float | None = None
     weighted_avg_watts: float | None = None
     variability_index: float | None = None
+    rpe: int | None = None
+    comment: str | None = None
+    workout_summary: str | None = None
 
 class TrainingZones(BaseModel):
     types: list[str] = Field(default_factory=list)

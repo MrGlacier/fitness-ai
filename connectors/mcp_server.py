@@ -13,7 +13,7 @@ fitness_analyzer_instance = fitness_analyzer.FitnessAnalyzer(intervals_client_in
 @mcp.tool()
 def get_last_workout(sport_type: str | None = None) -> Workout | None:
     """Liefert das letzte abgeschlossene Workout, optional gefiltert nach einer Sportart wie run, ride oder swim."""
-    return intervals_client_instance.get_last_workout(sport_type)
+    return fitness_analyzer_instance.get_last_workout(sport_type)
 
 @mcp.tool()
 def get_workouts(

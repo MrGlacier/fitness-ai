@@ -131,7 +131,7 @@ class IntervalsClient:
         weighted_avg_watts = activity.get("icu_weighted_avg_watts")
         variability_index = activity.get("icu_variability_index")
 
-        return Workout(
+        workout =  Workout(
             id = activity["id"],
             name = activity["name"],
             start_time = datetime.fromisoformat(start_date),
@@ -146,8 +146,12 @@ class IntervalsClient:
             elevation_gain = round(elevation_gain, 1) if elevation_gain is not None else None,
             decoupling = round(decoupling, 2) if decoupling is not None else None,
             weighted_avg_watts = round(weighted_avg_watts, 1) if weighted_avg_watts is not None else None,
-            variability_index = (round(variability_index, 2) if variability_index is not None else None)
+            rpe = activity.get("icu_rpe"),
+            comment = activity.get("description"),
+            variability_index = (round(variability_index, 2) if variability_index is not None else None),
         )
+
+        return workout
     
     def _map_athlete(self, athlete_data: dict) -> Athlete:
         return Athlete(
