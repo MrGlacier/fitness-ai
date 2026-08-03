@@ -2,6 +2,7 @@
 # https://thushan.github.io/olla/api-reference/llamacpp/
 
 import httpx
+import time
 
 from core import config
 from llm import prompts
@@ -41,12 +42,27 @@ class LlmClient:
             "answer": answer_received
         }
     
+
     def _post(self, url: str, post_data: dict | None = None) -> dict:
-        #logger.info(f"url: {url}, {query_string}")
         try:
+            start = time.perf_counter()
             response = self.httpx_client.post(url, json=post_data)
+            duration = time.perf_counter() - start
             response.raise_for_status()
-            return response.json()
+            response_json = response.json()
+            logger.info("LLM antwortete in %.2f Sekunden", duration)
+            usage = response_json.get("usage")
+
+            if usage:
+                logger.info(
+                    "Prompt Tokens: %s | Completion Tokens: %s | Total Tokens: %s",
+                    usage.get("prompt_tokens"),
+                    usage.get("completion_tokens"),
+                    usage.get("total_tokens"),
+                )
+
+            return response_json
+
         except httpx.HTTPStatusError as error:
             logger.exception(
                 "LLM API request failed. Status: %s, URL: %s",
@@ -54,6 +70,7 @@ class LlmClient:
                 f"{self.httpx_client.base_url}{url}",
             )
             raise
+
         except httpx.RequestError as error:
             logger.exception(
                 "LLM API request failed. URL: %s",
