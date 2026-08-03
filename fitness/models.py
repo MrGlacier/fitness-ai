@@ -1,6 +1,22 @@
 from datetime import date, datetime
 from pydantic import BaseModel, Field
 
+
+class WorkoutSplit(BaseModel):
+    index: int
+    label: str | None = None
+    split_type: str | None = None
+    distance_km: float | None = None
+    duration_sec: int | None = None
+    pace_sec_per_km: float | None = None
+    avg_speed_kmh: float | None = None
+    avg_hr: int | None = None
+    max_hr: int | None = None
+    avg_watts: float | None = None
+    avg_cadence: float | None = None
+    elevation_gain: float | None = None
+
+
 class Workout(BaseModel):
     id: str
     name: str
@@ -25,6 +41,11 @@ class Workout(BaseModel):
     similar_avg_rpe: float | None = None
     similar_avg_intensity: float | None = None
     similar_workouts_count: int = 0
+    splits: list[WorkoutSplit] = Field(default_factory=list)
+    detail_summary: str | None = None
+    recovery_summary: str | None = None
+    days_since_previous_same_sport: int | None = None
+
 
 class TrainingZones(BaseModel):
     types: list[str] = Field(default_factory=list)
@@ -41,12 +62,14 @@ class TrainingZones(BaseModel):
     pace_zones: list[float] | None = None
     pace_zone_names: list[str] | None = None
 
+
 class Athlete(BaseModel):
     id: str
     name: str
     city: str | None = None
     email: str
     timezone: str
+
 
 class TrainingStatus(BaseModel):
     date: date
@@ -58,3 +81,6 @@ class TrainingStatus(BaseModel):
     resting_hr: int | None = None
     hrv: float | None = None
     sleep_secs: int | None = None
+    sleep_quality: int | None = None
+    sleep_score: float | None = None
+    readiness: float | None = None
