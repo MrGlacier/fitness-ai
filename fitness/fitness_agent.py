@@ -209,6 +209,9 @@ Regeln:
 - Erkläre notwendige Fachbegriffe kurz und verständlich.
 - Verwende kein Markdown.
 - Antworte ausschließlich mit der fertigen Antwort.
+- Beende die Antwort nicht mit Formulierungen wie „Das ist alles, was die Daten sagen“.
+- Wenn die Datenlage begrenzt ist, formuliere stattdessen sachlich und konstruktiv, zum Beispiel:
+  „Für eine belastbarere Einordnung wären weitere vergleichbare Einheiten hilfreich.“
 
 Frage des Athleten:
 
@@ -258,7 +261,8 @@ Antwort:
             if tool_answer.structuredContent is not None:
                 tool_result = tool_answer.structuredContent.get("result")
             elif tool_answer.content and tool_answer.content[0].text:
-                tool_result = json.loads(tool_answer.content[0].text)
+                tool_answer_text = tool_answer.content[0].text
+                tool_result = json.loads(tool_answer_text)
             else:
                 tool_result = None
 

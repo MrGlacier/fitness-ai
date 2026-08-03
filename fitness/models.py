@@ -20,6 +20,11 @@ class Workout(BaseModel):
     rpe: int | None = None
     comment: str | None = None
     workout_summary: str | None = None
+    comparison_summary: str | None = None
+    similar_avg_hr: float | None = None
+    similar_avg_rpe: float | None = None
+    similar_avg_intensity: float | None = None
+    similar_workouts_count: int = 0
 
 class TrainingZones(BaseModel):
     types: list[str] = Field(default_factory=list)
