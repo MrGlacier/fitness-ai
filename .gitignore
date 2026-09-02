@@ -19,3 +19,6 @@ logs/
 .DS_Store
 .idea/
 .vscode/
+
+#open Web Ui
+.openWebUi_Lokale_Admin_Konto_Daten
