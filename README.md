@@ -1,99 +1,215 @@
-# Fitness AI
+<div align="center">
 
-Eine lokale Fitness-AI für Triathlon- und Ausdauertraining.
+# 🏊‍♂️ 🚴‍♂️ 🏃‍♂️ Fitness AI
 
-Das Projekt verbindet ein lokal laufendes Sprachmodell über `llama.cpp` mit Fitnessdaten aus der Intervals.icu API. Die Fitness-AI entscheidet selbstständig, welche MCP-Tools für eine Benutzerfrage benötigt werden, ruft diese auf und formuliert daraus eine verständliche Antwort.
+**Dein lokaler AI-Assistent für Triathlon- und Ausdauertraining**
 
-Das Projekt dient gleichzeitig als Lernprojekt für LLMs, Tool-Calling, MCP und den Aufbau einfacher AI-Agenten.
+<img alt="Python 3.12+" src="https://img.shields.io/badge/Python-3.12%2B-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white">
+<img alt="uv Paketverwaltung" src="https://img.shields.io/badge/uv-Paketverwaltung-DE5FE9?style=for-the-badge">
+<img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-API-009688?style=for-the-badge&amp;logo=fastapi&amp;logoColor=white">
+<img alt="Docker und Open WebUI" src="https://img.shields.io/badge/Docker-Open_WebUI-2496ED?style=for-the-badge&amp;logo=docker&amp;logoColor=white">
+<img alt="100 % lokale AI" src="https://img.shields.io/badge/AI-100%25_lokal-7C3AED?style=for-the-badge">
 
----
+</div>
 
-## Voraussetzungen
+Eine lokale Fitness-AI für Triathlon- und Ausdauertraining. Sie verbindet ein
+lokal über `llama.cpp` laufendes Sprachmodell mit Fitnessdaten aus der
+Intervals.icu API. Ein Tool-Planer wählt abhängig von der Frage die passenden
+MCP-Tools aus; der `FitnessAnalyzer` bereitet die Daten auf und das Sprachmodell
+formuliert daraus die Antwort.
 
-- Python 3.12+
-- `uv`
+Das Projekt dient zugleich als Lernprojekt für lokale LLMs, Tool-Calling, MCP
+und einfache AI-Agenten.
+
+## ✅ Voraussetzungen
+
+- Linux mit Bash und tmux
+- Python 3.12 oder neuer
+- [`uv`](https://docs.astral.sh/uv/)
 - Intervals.icu Account und API-Zugang
-- `llama.cpp` mit `llama-server`
-- lokales GGUF-Modell, aktuell Qwen3 14B Q4_K_M
-- Docker für Open WebUI
-- `.env` Datei mit den benötigten Zugangsdaten
+- `llama.cpp` mit einem über `PATH` erreichbaren `llama-server`
+- ein lokales GGUF-Modell (voreingestellt ist Qwen3 14B Q4_K_M)
+- Docker; falls nötig, verwendet das Startskript automatisch `sudo docker`
 
----
+## ⚙️ Installation und Konfiguration
 
-## Installation
-
-Abhängigkeiten installieren:
+Python-Abhängigkeiten installieren:
 
 ```bash
 uv sync
 ```
 
----
-
-## LLM starten
-
-Aktuell wird Qwen3 14B über `llama-server` auf Port `8080` gestartet:
+Konfigurationsdatei anlegen:
 
 ```bash
-llama-server \
-  -m /home/MrGlacier/.cache/llama.cpp/Qwen_Qwen3-14B-GGUF_Qwen3-14B-Q4_K_M.gguf \
-  --host 127.0.0.1 \
-  --port 8080 \
-  -ngl 99 \
-  -c 8192 \
-  --flash-attn on \
-  --jinja
+cp .env.example .env
 ```
 
-Die Parameter bedeuten:
+Anschließend in `.env` mindestens diese Werte eintragen:
 
-- `-ngl 99`: möglichst alle Modell-Layer auf die GPU auslagern
-- `-c 8192`: Kontextfenster auf 8192 Tokens begrenzen
-- `--flash-attn on`: Flash Attention aktivieren
-- `--jinja`: das im Modell hinterlegte Chat-Template verwenden
+```dotenv
+INTERVALS_ICU_BASE_URL=https://intervals.icu/
+INTERVALS_ICU_API=api/v1
+INTERVALS_ICU_USER_NAME=API_KEY
+INTERVALS_ICU_ATHLETE_ID=<athlete-id>
+INTERVALS_ICU_API_KEY=<api-key>
+LLM_BASE_URL=http://127.0.0.1:8080/
+```
 
-Falls es zu CUDA-Speicherfehlern kommt, kann Flash Attention deaktiviert oder das Kontextfenster reduziert werden:
+`INTERVALS_ICU_USER_NAME` bleibt für die API-Authentifizierung normalerweise
+auf `API_KEY`. Die eigene Athlete-ID und der API-Key müssen ergänzt werden.
+Die `.env` ist bereits von Git ausgeschlossen.
+
+> [!IMPORTANT]
+> Trage echte Zugangsdaten ausschließlich in `.env` ein. Die Datei
+> `.env.example` bleibt eine Vorlage ohne geheime Werte.
+
+Vor dem ersten Start müssen außerdem die Variablen `PROJECT_DIR` und `MODEL`
+am Anfang von `fitness-ai.sh` zu den lokalen Pfaden passen:
 
 ```bash
---flash-attn off
+PROJECT_DIR="/pfad/zum/fitness-ai-projekt"
+MODEL="/pfad/zum/modell.gguf"
 ```
 
-oder beispielsweise:
+Falls das Skript nach dem Kopieren nicht ausführbar ist:
 
 ```bash
--c 4096
+chmod +x fitness-ai.sh
 ```
 
----
+## 🚀 Startskript verwenden
 
-## Fitness-AI aufrufen
+`fitness-ai.sh` verwaltet den gesamten lokalen Stack:
 
-Die Fitness-AI wird aus dem Projektverzeichnis gestartet. Die Benutzerfrage wird als Argument übergeben:
+- `llama-server` auf `127.0.0.1:8080`
+- die Fitness-AI API auf `0.0.0.0:8000`
+- Open WebUI auf `localhost:3000`
+- eine gemeinsame tmux-Session namens `fitness-ai`
+
+Der normale Start erfolgt aus dem Projektverzeichnis:
+
+```bash
+./fitness-ai.sh start
+```
+
+Beim ersten Start wird der Open-WebUI-Container automatisch aus
+`ghcr.io/open-webui/open-webui:main` erstellt. Das Docker-Volume `open-webui`
+bewahrt dessen Daten auch nach einem Stopp des Containers auf.
+
+### 🎛️ Befehle und Argumente
+
+Das Skript wertet einen der folgenden Befehle als erstes Argument aus:
+
+| Aktion | Befehl | Wirkung |
+| :---: | --- | --- |
+| 🟢 | `./fitness-ai.sh start` | Startet Open WebUI sowie die tmux-Session mit LLM und API. Bereits laufende Komponenten werden nicht erneut gestartet. |
+| 🔴 | `./fitness-ai.sh stop` | Beendet die tmux-Session und stoppt den Open-WebUI-Container. |
+| 🔄 | `./fitness-ai.sh restart` | Stoppt und startet den gesamten Stack neu. |
+| 🔍 | `./fitness-ai.sh status` | Zeigt den Status von LLM/API und Open WebUI an. |
+| 🖥️ | `./fitness-ai.sh console` | Öffnet die gemeinsame tmux-Konsole. Die Anwendung muss dafür bereits laufen. |
+
+Ohne Argument oder mit einem unbekannten Argument zeigt das Skript die
+Verwendung an und beendet sich mit Statuscode 1. Weitere Optionen oder
+Positionsargumente unterstützt es derzeit nicht.
+
+### 🖥️ tmux-Konsole bedienen
+
+In der tmux-Session werden drei untereinander angeordnete Panes angezeigt:
+
+1. `LLM` – Ausgabe von `llama-server`
+2. `API` – Ausgabe von Uvicorn/FastAPI
+3. `WEBUI` – Docker-Logs von Open WebUI
+
+Die Konsole öffnen:
+
+```bash
+./fitness-ai.sh console
+```
+
+Zwischen den Panes nach oben oder unten wechseln:
+
+```text
+Ctrl+B  ↑
+Ctrl+B  ↓
+```
+
+Alternativ wechselt folgende Tastenkombination zum jeweils nächsten Pane:
+
+```text
+Ctrl+B  o
+```
+
+Detach ohne die laufenden Dienste zu stoppen:
+
+```text
+Ctrl+B
+D
+```
+
+Später lässt sich die Session wieder öffnen:
+
+```bash
+./fitness-ai.sh console
+```
+
+Zum tatsächlichen Beenden aller Dienste den Skriptbefehl verwenden:
+
+```bash
+./fitness-ai.sh stop
+```
+
+Nach dem Start sind die Dienste hier erreichbar:
+
+- 💬 Open WebUI: <http://localhost:3000>
+- ⚡ Fitness-AI API: <http://localhost:8000>
+- 🧠 lokaler LLM-Server: <http://localhost:8080>
+
+## 💬 Open WebUI einrichten
+
+Beim ersten Aufruf unter <http://localhost:3000> muss ein lokales Admin-Konto
+angelegt werden. Zugangsdaten können lokal in
+`.openWebUi_Lokale_Admin_Konto_Daten` abgelegt werden; diese Datei ist über
+`.gitignore` vom Repository ausgeschlossen.
+
+In Open WebUI eine OpenAI-Verbindung mit folgenden Werten anlegen:
+
+```text
+Base URL: http://host.docker.internal:8000/v1
+API-Key:  local-fitness-ai
+```
+
+Der API-Key ist derzeit nur ein Dummy-Wert, da die lokale Fitness-AI API ihn
+nicht prüft. Danach sollte das Modell `fitness-ai` zur Auswahl stehen.
+
+> [!WARNING]
+> Die Installation ist ausschließlich für lokale Entwicklung gedacht. API und
+> Open WebUI sollten nicht öffentlich erreichbar gemacht werden.
+
+## 💻 Terminal-Client verwenden
+
+Wenn der Stack läuft, kann die Fitness-AI alternativ direkt im Terminal
+aufgerufen werden:
 
 ```bash
 PYTHONPATH=. uv run python -m main "Wie ist mein aktueller Trainingszustand?"
 ```
 
-Weitere Beispiele:
+Mehrere Argumente werden als mehrere eigenständige Fragen verarbeitet:
 
 ```bash
-PYTHONPATH=. uv run python -m main "Wie hoch ist meine aktuelle FTP?"
+PYTHONPATH=. uv run python -m main \
+  "Wie hoch ist meine aktuelle FTP?" \
+  "Zeige mir mein letztes Lauftraining."
 ```
 
-```bash
-PYTHONPATH=. uv run python -m main "Zeige mir mein letztes Lauftraining."
-```
+Weitere Beispielfragen:
 
-```bash
-PYTHONPATH=. uv run python -m main "Bewerte meine letzte Trainingseinheit."
-```
-
-```bash
-PYTHONPATH=. uv run python -m main "Welche Herzfrequenzzonen habe ich beim Laufen?"
-```
-
-```bash
-PYTHONPATH=. uv run python -m main "Welche Einheit sollte ich heute machen?"
+```text
+Bewerte meine letzte Trainingseinheit.
+Welche Herzfrequenzzonen habe ich beim Laufen?
+Welche Einheit sollte ich heute machen?
+Wie viele Kilometer bin ich in den letzten 14 Tagen gelaufen?
 ```
 
 Je nach Frage unterscheidet die Fitness-AI zwischen:
@@ -101,294 +217,93 @@ Je nach Frage unterscheidet die Fitness-AI zwischen:
 - `data`: sachliche Abfragen, Berechnungen und Vergleiche
 - `coach`: Bewertungen, Einordnungen und Trainingsempfehlungen
 
----
-
-## Ablauf einer Anfrage
+## 🧩 Architektur und Ablauf
 
 ```text
-Benutzerfrage
-    ↓
-Tool-Planer wählt passende MCP-Tools
-    ↓
-MCP-Tools werden ausgeführt
-    ↓
-FitnessAnalyzer bereitet die Daten fachlich auf
-    ↓
-LLM formuliert die fertige Antwort
+Browser → Open WebUI :3000 → OpenAI-kompatible API :8000 ┐
+                                                          ├→ FitnessAgent
+Terminal ───────────────────────────────→ main.py ─────────┘       ↓
+                                                       Tool-Planer und MCP-Tools
+                                                                  ↓
+                                                FitnessAnalyzer / Intervals.icu
+                                                                  ↓
+                                             llama-server :8080 / lokales Qwen
 ```
 
-Der Tool-Planer verwendet Qwen im Modus `/no_think`. Dadurch werden einfache Tool-Entscheidungen schneller und mit deutlich weniger erzeugten Tokens beantwortet.
+Der Tool-Planer erhält die verfügbaren MCP-Tools zur Laufzeit und verwendet
+Qwen im Modus `/no_think`. Die Tool-Auswahl ist daher nicht als feste Liste im
+LLM-Prompt hinterlegt.
 
----
+Aktuell stehen unter anderem folgende Funktionen bereit:
 
-## Logging
+- Verbindung zu Intervals.icu testen
+- Athlete-Stammdaten abrufen
+- Workouts nach Zeitraum und Sportart abrufen
+- letzte Trainingseinheit einschließlich Detailauswertung abrufen
+- FTP sowie Trainings- und Herzfrequenzzonen abrufen
+- aktuellen Trainings- und Erholungsstatus mit Fitness, Ermüdung, Form,
+  Ruhepuls, HRV, Schlaf und subjektivem Befinden auswerten
+- mehrere MCP-Tools für eine Frage kombinieren
+- BMI berechnen
 
-Die Anwendung protokolliert unter anderem:
+## 🔌 API direkt testen
 
-- ausgewählte MCP-Tools und Argumente
-- Tool-Ergebnisse
-- Antwortzeit des LLM
-- Prompt-, Completion- und Gesamt-Tokens
+Status und Modellliste abrufen:
 
-Das Log kann während eines Tests live verfolgt werden:
+```bash
+curl http://localhost:8000/
+curl http://localhost:8000/v1/models
+```
+
+Eine nicht streamende Chat-Anfrage senden:
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "fitness-ai",
+    "messages": [
+      {"role": "user", "content": "Wie hoch ist meine aktuelle FTP?"}
+    ],
+    "stream": false
+  }'
+```
+
+Der Chat-Endpunkt unterstützt außerdem OpenAI-kompatible SSE-Antworten mit
+`"stream": true`. Die vollständige Antwort wird momentan in einem einzelnen
+Chunk übertragen; echtes Token-für-Token-Streaming ist noch nicht
+implementiert.
+
+Open WebUI übermittelt zwar den bisherigen Chatverlauf, `api.py` reicht aktuell
+aber nur die letzte Nachricht mit der Rolle `user` an den `FitnessAgent` weiter.
+Mehrturn-Kontext wird daher noch nicht ausgewertet.
+
+## 🛠️ Logging und Entwicklung
+
+Die Anwendung protokolliert Tool-Aufrufe, Tool-Ergebnisse, LLM-Antwortzeiten
+und – sofern vom LLM-Server geliefert – die Token-Nutzung. Das Log live
+verfolgen:
 
 ```bash
 tail -f core/fitness-ai.log
 ```
 
----
-
-## Aktuelle Funktionen
-
-Die Fitness-AI unterstützt unter anderem:
-
-- Verbindung zu Intervals.icu testen
-- Workouts und letzte Trainingseinheiten abrufen
-- aktuelle FTP und Trainingszonen abrufen
-- Trainingsbelastung und aktuellen Trainingszustand auswerten
-- Ruhepuls, HRV und Schlafdaten in Antworten berücksichtigen
-- Datenfragen von Trainerfragen unterscheiden
-- mehrere MCP-Tools für eine Frage kombinieren
-- BMI berechnen
-- Nutzung über Open WebUI statt ausschließlich über das Terminal
-- OpenAI-kompatible HTTP-API über FastAPI
-
-Die verfügbaren MCP-Tools werden dem Tool-Planer zur Laufzeit übergeben. Dadurch muss die Tool-Auswahl nicht fest im LLM-Prompt hinterlegt werden.
-
----
-
-## Open WebUI
-
-Open WebUI wird als lokale Chat-Oberfläche für die Fitness AI verwendet.
-
-Die Architektur sieht aktuell so aus:
-
-```text
-Browser
-    ↓
-Open WebUI :3000
-    ↓
-OpenAI-kompatible HTTP-API :8000
-    ↓
-FitnessAgent
-    ↓
-MCP / FitnessAnalyzer / Intervals.icu
-    ↓
-lokales Qwen-Modell über llama-server :8080
-```
-
-Open WebUI ersetzt dabei **nicht** den FitnessAgent oder dessen Tool-Logik. Es dient ausschließlich als Benutzeroberfläche.
-
-### Open WebUI beim ersten Mal erstellen
-
-Der Container wird einmalig mit folgendem Befehl angelegt:
+Tests ausführen:
 
 ```bash
-docker run -d \
-  -p 3000:8080 \
-  --add-host=host.docker.internal:host-gateway \
-  -v open-webui:/app/backend/data \
-  --name open-webui \
-  --restart always \
-  ghcr.io/open-webui/open-webui:main
+uv run python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-Falls Docker für den aktuellen Benutzer nicht freigegeben ist, den Befehl mit `sudo` ausführen:
-
-```bash
-sudo docker run -d \
-  -p 3000:8080 \
-  --add-host=host.docker.internal:host-gateway \
-  -v open-webui:/app/backend/data \
-  --name open-webui \
-  --restart always \
-  ghcr.io/open-webui/open-webui:main
-```
-
-Danach ist Open WebUI erreichbar unter:
-
-```text
-http://localhost:3000
-```
-
-### Wenn der Container bereits existiert
-
-Der Container muss **nicht erneut mit `docker run` erstellt werden**.
-
-Vorhandene Container anzeigen:
-
-```bash
-docker ps -a
-```
-
-Open WebUI starten:
-
-```bash
-docker start open-webui
-```
-
-Prüfen, ob der Container läuft:
-
-```bash
-docker ps
-```
-
-Open WebUI stoppen:
-
-```bash
-docker stop open-webui
-```
-
-Open WebUI neu starten:
-
-```bash
-docker restart open-webui
-```
-
-Logs anzeigen:
-
-```bash
-docker logs -f open-webui
-```
-
-Falls Docker nur mit Root-Rechten verwendet werden kann, bei diesen Befehlen entsprechend `sudo` davor setzen.
-
-### Lokales Admin-Konto
-
-Open WebUI benötigt beim ersten Start einen lokalen Admin-Account.
-
-Die Zugangsdaten für das lokale Admin-Konto befinden sich in:
-
-```text
-.openWebUi_Lokale_Admin_Konto_Daten
-```
-
-**Wichtig:** Die Datei enthält lokale Zugangsdaten und darf nicht in das Git-Repository eingecheckt werden.
-
-Sie muss deshalb in `.gitignore` eingetragen sein:
-
-```gitignore
-.openWebUi_Lokale_Admin_Konto_Daten
-```
-
-Die aktuelle Open-WebUI-Installation ist ausschließlich für die lokale Entwicklung vorgesehen und darf nicht öffentlich erreichbar gemacht werden.
-
-### Fitness-AI API starten
-
-Open WebUI kommuniziert nicht direkt mit dem `FitnessAgent`, sondern über die OpenAI-kompatible API in `api.py`.
-
-Die benötigten Python-Abhängigkeiten sind:
-
-```bash
-uv add fastapi uvicorn
-```
-
-Die API wird aus dem Projektverzeichnis gestartet:
-
-```bash
-PYTHONPATH=. uv run uvicorn api:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Die API kann anschließend getestet werden:
-
-```bash
-curl http://localhost:8000/
-```
-
-Modelle anzeigen:
-
-```bash
-curl http://localhost:8000/v1/models
-```
-
-Die Antwort sollte das Modell `fitness-ai` enthalten.
-
-### Open WebUI mit der Fitness-AI verbinden
-
-In Open WebUI unter den OpenAI-Verbindungen folgende Base URL verwenden:
-
-```text
-http://host.docker.internal:8000/v1
-```
-
-Falls Open WebUI einen API-Key verlangt, kann für die lokale Entwicklung ein beliebiger Dummy-Wert verwendet werden, zum Beispiel:
-
-```text
-local-fitness-ai
-```
-
-Die Fitness-AI API prüft aktuell keinen API-Key.
-
-Anschließend sollte in Open WebUI das Modell
-
-```text
-fitness-ai
-```
-
-zur Auswahl stehen.
-
-### Streaming
-
-Open WebUI verwendet standardmäßig Streaming für Chat-Antworten.
-
-Die API unterstützt deshalb den OpenAI-kompatiblen Streaming-Endpunkt. Aktuell wird die fertige Antwort des `FitnessAgent` in einem einzelnen SSE-Chunk übertragen.
-
-Echtes Token-für-Token-Streaming ist aktuell noch nicht implementiert.
-
-### Aktueller Gesprächsstand
-
-Open WebUI sendet bereits den vollständigen bisherigen Chatverlauf an die Fitness-AI API.
-
-Aktuell wird in `api.py` jedoch nur die jeweils letzte Nachricht des Benutzers an
-
-```python
-FitnessAgent.ask(question)
-```
-
-weitergegeben.
-
-Der nächste Entwicklungsschritt ist daher:
-
-```text
-Conversation History
-    ↓
-FitnessAgent
-    ↓
-Antwort oder echte Rückfrage
-```
-
-Damit soll die Fitness-AI künftig echte Mehrturn-Gespräche führen und selbst Rückfragen stellen können.
-
----
-
-## Entwicklung
-
-Neue Abhängigkeit hinzufügen:
+Neue Python-Abhängigkeit hinzufügen:
 
 ```bash
 uv add <paketname>
 ```
 
-Projekt mit Logausgabe testen:
+## 🎯 Projektziel
 
-```bash
-PYTHONPATH=. uv run python -m main "Wie ist mein aktueller Trainingszustand?"
-```
-
----
-
-## Ziel des Projekts
-
-Die Fitness-AI soll schrittweise lernen:
-
-- natürliche Benutzerfragen zu verstehen
-- passende Tools und Argumente auszuwählen
-- mehrere Datenquellen zu kombinieren
-- Trainingsdaten fachlich nachvollziehbar aufzubereiten
-- sachliche Datenantworten von Coach-Antworten zu unterscheiden
-- persönliche Trainingsempfehlungen vorsichtig und begründet zu formulieren
-- Gesprächskontext über mehrere Nachrichten hinweg zu verstehen
-- bei fehlenden Informationen selbstständig Rückfragen zu stellen
-- später Trainingsplanung und Plan-vs-Ist-Auswertung zu unterstützen
-
-Der Fokus liegt auf einer einfachen, lesbaren und gut debuggbaren Architektur.
+Die Fitness-AI soll natürliche Fragen verstehen, passende Datenquellen
+kombinieren und Trainingsdaten nachvollziehbar aufbereiten. Geplante nächste
+Schritte sind echter Gesprächskontext mit Rückfragen sowie Trainingsplanung und
+Plan-vs-Ist-Auswertungen. Der Fokus bleibt auf einer einfachen, lesbaren und
+gut debuggbaren Architektur.
