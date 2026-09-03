@@ -189,18 +189,32 @@ async def chat_completions(request: ChatCompletionRequest):
     # Uns interessiert aktuell nur die letzte User-Nachricht.
     # -----------------------------------------------------------------------
 
-    user_message = None
+    question = None
+    history = []
 
-    for message in reversed(request.messages):
+    for message in request.messages:
+
+        # Die letzte User-Nachricht merken wir uns als aktuelle Frage.
         if message.role == "user":
-            user_message = message.content
-            break
+            question = message.content
 
-    if user_message is None:
+        # Alle Nachrichten sammeln wir erstmal als History.
+        history.append({
+            "role": message.role,
+            "content": message.content,
+        })
+
+
+    if question is None:
         raise HTTPException(
             status_code=400,
             detail="Keine User-Nachricht gefunden.",
         )
+
+
+    # Die aktuelle Frage ist bereits separat in "question".
+    # Deshalb entfernen wir sie am Ende wieder aus der History.
+    history = history[:-1]
 
     # -----------------------------------------------------------------------
     # Übergang zu unserer eigentlichen Fitness-AI
@@ -228,7 +242,10 @@ async def chat_completions(request: ChatCompletionRequest):
     # -----------------------------------------------------------------------
 
     try:
-        answer = await fitness_agent.ask(user_message)
+        answer = await fitness_agent.ask(
+            question=question,
+            history=history,
+        )
 
     except Exception as error:
         # Für die Entwicklungsphase geben wir die eigentliche

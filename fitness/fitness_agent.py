@@ -32,8 +32,10 @@ Verfügbare Tools:
 
 {tools}
 
-Benutzerfrage:
+Bisheriger Gesprächsverlauf:
+{history_text}
 
+Aktuelle Benutzerfrage:
 {question}
 
 Antworttypen:
@@ -56,6 +58,12 @@ Antworttypen:
   - Bewerte meine letzten Trainings.
   - Schlage mir anhand meiner FTP und meiner letzten Trainings eine Einheit vor.
   - Wie sollte ich meine nächste Trainingswoche gestalten?
+  - Benutzerfrage:
+    „Wie war mein letzter Lauf im Vergleich zum Lauf davor?“
+  - Passende Tool-Auswahl:
+    - `get_recent_workouts` mit `sport_type="run"`
+  - Nicht passend:
+    - zweimal `get_last_workout`
 
 Wichtige Regeln:
 
@@ -74,6 +82,9 @@ Wichtige Regeln:
 - Verwende optionale Sportart-Argumente in diesem Fall mit `null`.
 - Eine Formulierung wie „meine letzte Trainingseinheit“ meint die letzte Einheit über alle Sportarten.
 - Eine Formulierung wie „mein letzter Lauf“ oder „meine letzte Radeinheit“ enthält dagegen eine konkrete Sportart.
+- Wenn der Benutzer zwei oder mehrere vergangene Einheiten derselben Sportart vergleichen möchte, verwende ein Tool, das mehrere passende Workouts liefert, z. B. `get_recent_workouts`.
+- Verwende `get_last_workout` nicht mehrfach, um verschiedene vergangene Einheiten derselben Sportart zu erhalten. Mehrere Aufrufe von `get_last_workout` liefern dieselbe letzte Einheit.
+- Formulierungen wie „der Lauf davor“, „die vorherige Einheit“, „der vorletzte Lauf“ oder „im Vergleich zum vorherigen Training“ erfordern mehrere vergangene Workouts.
 
 Erwartetes Format:
 
@@ -157,7 +168,11 @@ Regeln:
 - Verwende kein Markdown.
 - Antworte ausschließlich mit der fertigen Antwort.
 
-Frage des Athleten:
+Bisheriger Gesprächsverlauf:
+
+{history_text}
+
+Aktuelle Frage des Athleten:
 
 {pre_question}
 
@@ -215,7 +230,11 @@ Regeln:
 - Wenn die Datenlage begrenzt ist, formuliere stattdessen sachlich und konstruktiv, zum Beispiel:
   „Für eine belastbarere Einordnung wären weitere vergleichbare Einheiten hilfreich.“
 
-Frage des Athleten:
+Bisheriger Gesprächsverlauf:
+
+{history_text}
+
+Aktuelle Frage des Athleten:
 
 {pre_question}
 
@@ -226,10 +245,26 @@ Verwendete Fitness-Tools und Ergebnisse:
 Antwort:
 """
 
-    async def ask(self, question: str) -> str:
+    async def ask(
+        self,
+        question: str,
+        history: list[dict] | None = None,
+    ) -> str:
+        if history is None:
+            history = []
+
+        history_text = ""
+
+        for message in history:
+            role = message["role"]
+            content = message["content"]
+
+            history_text += f"{role}: {content}\n"
+
         tools_description = await self.build_tools_description_for_llm()
         tool_prompt = self.ask_for_tool_prompt.format(
             tools=tools_description,
+            history_text=history_text,
             question=question,
         )
 
@@ -277,6 +312,7 @@ Antwort:
 
         return self.__generate_answer(
             pre_question=question,
+            history_text=history_text,
             response_type=tools_json["response_type"],
             tool_results=tool_results,
         )
@@ -284,6 +320,7 @@ Antwort:
     def __generate_answer(
         self,
         pre_question: str,
+        history_text: str,
         response_type: str,
         tool_results: list[dict],
     ) -> str:
@@ -299,8 +336,9 @@ Antwort:
         else:
             answer_prompt = self.data_answer_prompt
 
-        logger.info("Tool results for answer prompt: %s", tool_results)
+        #logger.info("Tool results for answer prompt: %s", tool_results)
         generated_question = answer_prompt.format(
+            history_text=history_text,
             pre_question=pre_question,
             tool_results=tool_results_json,
         )
