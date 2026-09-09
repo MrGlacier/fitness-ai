@@ -40,7 +40,8 @@ set -Eeuo pipefail
 
 PROJECT_DIR="/home/MrGlacier/_projects/fitness-ai"
 
-MODEL="/home/MrGlacier/.cache/llama.cpp/Qwen_Qwen3-14B-GGUF_Qwen3-14B-Q4_K_M.gguf"
+#MODEL="/home/MrGlacier/.cache/llama.cpp/Qwen_Qwen3-14B-GGUF_Qwen3-14B-Q4_K_M.gguf"
+MODEL="unsloth/Qwen3.6-35B-A3B-GGUF:UD-IQ4_NL"
 
 TMUX_SESSION="fitness-ai"
 
@@ -181,13 +182,20 @@ function start_tmux() {
         -n "fitness-ai" \
         -c "$PROJECT_DIR" \
         "llama-server \
-            -m '$MODEL' \
+            -hf '$MODEL' \
             --host 127.0.0.1 \
             --port 8080 \
-            -ngl 99 \
-            -c 8192 \
-            --flash-attn on \
-            --jinja"
+            -c 65536 \
+            -fa on \
+            -ctk q8_0 \
+            -ctv q8_0 \
+            --n-gpu-layers 99 \
+            --n-cpu-moe 31 \
+            --jinja \
+            --no-reasoning-preserve \
+            --temp 0.6 \
+            --top-p 0.95 \
+            --top-k 20"
 
 
     # =========================================================================

@@ -1,9 +1,33 @@
 import json
+import time
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field, ValidationError
 
 from llm.llm_client import LlmClient
 from connectors.mcp_client import McpClient
 
 from core.logger import logger
+
+
+# Token-Limits pro Schritt
+# Tool-Planning braucht genug Platz für vollständiges JSON mit Tool-Namen,
+# Argumenten und Beschreibung. 250 Tokens waren zu wenig und führen zu
+# finish_reason=length mit leerem Content.
+_MAX_TOKENS_TOOL_PLANNING = 1024
+_MAX_TOKENS_FINAL_ANSWER = 1000
+
+
+class ToolPlanItem(BaseModel):
+    tool: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    description: str = ""
+
+
+class ToolPlan(BaseModel):
+    status: Literal["found", "failed"]
+    response_type: Literal["data", "coach"]
+    tools: list[ToolPlanItem] = Field(default_factory=list)
 
 
 class FitnessAgent:
@@ -268,7 +292,20 @@ Antwort:
             question=question,
         )
 
-        tools_answer = self.llm_client_instance.ask(question=tool_prompt)
+        logger.info("[TOOL-PLANNING] Promptlänge: %d Zeichen", len(tool_prompt))
+        tool_start = time.perf_counter()
+
+        tools_answer = self.llm_client_instance.ask(
+            question=tool_prompt,
+            max_tokens=_MAX_TOKENS_TOOL_PLANNING,
+            step_name="TOOL-PLANNING",
+        )
+
+        tool_duration = time.perf_counter() - tool_start
+        logger.info(
+            "[TOOL-PLANNING] Fertig in %.2f Sekunden",
+            tool_duration,
+        )
         tools_answer_string = (
             tools_answer["answer"]
             .replace("```json", "")
@@ -276,32 +313,56 @@ Antwort:
             .strip()
         )
 
-        tools_json = json.loads(tools_answer_string)
-        if tools_json["status"] != "found":
+        try:
+            tool_plan = ToolPlan.model_validate_json(tools_answer_string)
+        except ValidationError as error:
+            logger.error(
+                "[TOOL-PLANNING] Ungültiger Tool-Plan: %r, Fehler: %s",
+                tools_answer_string,
+                error,
+            )
+            raise ValueError(
+                "LLM hat keinen gültigen Tool-Plan zurückgegeben."
+            ) from error
+
+        if tool_plan.status != "found":
             return (
                 f"Für die Frage '{question}' konnte kein passendes "
                 f"Tool gefunden werden."
             )
 
+        if not tool_plan.tools:
+            raise ValueError(
+                "LLM meldete einen gefundenen Tool-Plan, lieferte aber keine Tools."
+            )
+
         tool_results = []
 
-        for tool in tools_json["tools"]:
-            tool_name = tool["tool"]
-            tool_arguments = tool.get("arguments", {})
-            tool_description = tool.get("description", "")
+        for tool in tool_plan.tools:
+            tool_name = tool.tool
+            tool_arguments = tool.arguments
+            tool_description = tool.description
+
+            logger.info(
+                "[MCP-TOOL] Starte %s mit %s",
+                tool_name,
+                tool_arguments,
+            )
+            tool_call_start = time.perf_counter()
 
             tool_answer = await self.mcp_client_instance.call_tool(
                 tool_name,
                 tool_arguments,
             )
 
-            if tool_answer.structuredContent is not None:
-                tool_result = tool_answer.structuredContent.get("result")
-            elif tool_answer.content and tool_answer.content[0].text:
-                tool_answer_text = tool_answer.content[0].text
-                tool_result = json.loads(tool_answer_text)
-            else:
-                tool_result = None
+            tool_call_duration = time.perf_counter() - tool_call_start
+            logger.info(
+                "[MCP-TOOL] %s fertig in %.2f Sekunden",
+                tool_name,
+                tool_call_duration,
+            )
+
+            tool_result = self._extract_tool_result(tool_answer)
 
             tool_results.append({
                 "tool": tool_name,
@@ -313,9 +374,32 @@ Antwort:
         return self.__generate_answer(
             pre_question=question,
             history_text=history_text,
-            response_type=tools_json["response_type"],
+            response_type=tool_plan.response_type,
             tool_results=tool_results,
         )
+
+    @staticmethod
+    def _extract_tool_result(tool_answer: Any) -> Any:
+        structured_content = getattr(tool_answer, "structuredContent", None)
+        if structured_content is not None:
+            if isinstance(structured_content, dict):
+                return structured_content.get("result", structured_content)
+            return structured_content
+
+        for content_item in getattr(tool_answer, "content", None) or []:
+            text = getattr(content_item, "text", None)
+            if not isinstance(text, str) or not text.strip():
+                continue
+
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                logger.warning(
+                    "MCP-Tool lieferte Text statt JSON; Text wird direkt verwendet."
+                )
+                return text
+
+        return None
 
     def __generate_answer(
         self,
@@ -326,9 +410,9 @@ Antwort:
     ) -> str:
         tool_results_json = json.dumps(
             tool_results,
-            indent=2,
             ensure_ascii=False,
             default=str,
+            separators=(",", ":"),
         )
 
         if response_type == "coach":
@@ -336,15 +420,29 @@ Antwort:
         else:
             answer_prompt = self.data_answer_prompt
 
-        #logger.info("Tool results for answer prompt: %s", tool_results)
         generated_question = answer_prompt.format(
             history_text=history_text,
             pre_question=pre_question,
             tool_results=tool_results_json,
         )
 
+        logger.info(
+            "[ANTWORT] Promptlänge: %d Zeichen, Typ: %s",
+            len(generated_question),
+            response_type,
+        )
+        answer_start = time.perf_counter()
+
         answer = self.llm_client_instance.ask(
             question=generated_question,
+            max_tokens=_MAX_TOKENS_FINAL_ANSWER,
+            step_name="ANTWORT",
+        )
+
+        answer_duration = time.perf_counter() - answer_start
+        logger.info(
+            "[ANTWORT] Fertig in %.2f Sekunden",
+            answer_duration,
         )
 
         return answer["answer"]

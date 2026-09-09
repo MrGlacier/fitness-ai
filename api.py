@@ -26,6 +26,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from core.logger import logger
 from fitness.fitness_agent import FitnessAgent
 from llm.llm_client import LlmClient
 from connectors.mcp_client import McpClient
@@ -190,13 +191,15 @@ async def chat_completions(request: ChatCompletionRequest):
     # -----------------------------------------------------------------------
 
     question = None
+    question_index = None
     history = []
 
-    for message in request.messages:
+    for index, message in enumerate(request.messages):
 
         # Die letzte User-Nachricht merken wir uns als aktuelle Frage.
         if message.role == "user":
             question = message.content
+            question_index = index
 
         # Alle Nachrichten sammeln wir erstmal als History.
         history.append({
@@ -205,16 +208,17 @@ async def chat_completions(request: ChatCompletionRequest):
         })
 
 
-    if question is None:
+    if question is None or question_index is None:
         raise HTTPException(
             status_code=400,
             detail="Keine User-Nachricht gefunden.",
         )
 
 
-    # Die aktuelle Frage ist bereits separat in "question".
-    # Deshalb entfernen wir sie am Ende wieder aus der History.
-    history = history[:-1]
+    # Nur die tatsächlich als aktuelle Frage ausgewählte User-Nachricht
+    # entfernen. Nachfolgende System- oder Assistant-Nachrichten bleiben Teil
+    # des Gesprächsverlaufs.
+    history.pop(question_index)
 
     # -----------------------------------------------------------------------
     # Übergang zu unserer eigentlichen Fitness-AI
@@ -248,13 +252,11 @@ async def chat_completions(request: ChatCompletionRequest):
         )
 
     except Exception as error:
-        # Für die Entwicklungsphase geben wir die eigentliche
-        # Fehlermeldung sichtbar zurück.
-        #
-        # Später kann hier Logging und eine sauberere Fehlerbehandlung hin.
+        # Fehler logging + saubere 500-Antwort mit Message
+        logger.exception("Chat-Verarbeitung fehlgeschlagen: %s", error)
         raise HTTPException(
             status_code=500,
-            detail=str(error),
+            detail={"error": type(error).__name__, "message": str(error)},
         ) from error
 
     # -----------------------------------------------------------------------
