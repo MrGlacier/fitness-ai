@@ -1,0 +1,695 @@
+/* ============================================================
+   Fitness AI Dashboard — Modern Dark Mode
+   ============================================================ */
+
+/* --- Reset & Basis --- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ====== DARK MODE (Standard) ====== */
+:root {
+    --bg:            #0a0a0f;
+    --bg-elevated:   #111118;
+    --card-bg:       #141420;
+    --card-border:   #2a2a3a;
+    --text:          #e4e4ed;
+    --text-muted:    #8888a0;
+    --accent:        #6366f1;
+    --accent-hover:  #818cf8;
+    --accent-soft:   rgba(99, 102, 241, 0.08);
+    --success:       #22c55e;
+    --warning:       #f59e0b;
+    --danger:        #ef4444;
+    --input-bg:      #1a1a2e;
+    --input-border:  #3a3a4e;
+    --table-stripe:  rgba(255, 255, 255, 0.015);
+}
+
+/* ====== LIGHT MODE Override ====== */
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg:            #f4f4f8;
+        --bg-elevated:   #eaeaef;
+        --card-bg:       #ffffff;
+        --card-border:   #e0e0e6;
+        --text:          #1a1a2e;
+        --text-muted:    #6b6b80;
+        --accent:        #4f46e5;
+        --accent-hover:  #4338ca;
+        --accent-soft:   rgba(79, 70, 229, 0.06);
+        --success:       #16a34a;
+        --warning:       #d97706;
+        --danger:        #dc2626;
+        --input-bg:      #ffffff;
+        --input-border:  #d1d5db;
+        --table-stripe:  rgba(0, 0, 0, 0.02);
+    }
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--card-border);
+    padding: 1rem 1.5rem;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-main h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--text);
+}
+
+.header-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+    display: block;
+}
+
+/* API-Status-Indikator */
+.api-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.api-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.api-disconnected .api-dot {
+    background: var(--danger);
+}
+
+/* ============================================================
+   Main Layout
+   ============================================================ */
+main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+}
+
+.card h2 {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+/* Hervorgehobene Card (Training heute) */
+.card-highlight {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+/* --- Training heute --- */
+.training-today-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.form-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 0.45rem 0.9rem;
+    width: fit-content;
+}
+
+.form-badge-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+.form-badge-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.form-summary {
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: var(--text);
+}
+
+.training-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.25rem;
+}
+
+/* ============================================================
+   KPI Grid
+   ============================================================ */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.85rem;
+}
+
+.kpi-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.kpi-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+.kpi-value {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.kpi-unit {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-top: 0.1rem;
+}
+
+/* ============================================================
+   Week Stats
+   ============================================================ */
+.week-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.week-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    font-size: 0.88rem;
+}
+
+.week-stat {
+    color: var(--text-muted);
+}
+
+.week-stat.tss {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.sport-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--card-border);
+}
+
+.sport-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    font-size: 0.85rem;
+}
+
+.sport-row:not(:last-child) {
+    border-bottom: 1px solid var(--card-border);
+}
+
+.sport-name {
+    font-weight: 500;
+    color: var(--text);
+}
+
+.sport-detail {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Workout Table
+   ============================================================ */
+.table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+}
+
+.workout-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.workout-table thead th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    padding: 0.7rem 0.75rem 0.55rem;
+    border-bottom: 2px solid var(--card-border);
+}
+
+.workout-table tbody td {
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid var(--card-border);
+    vertical-align: middle;
+}
+
+.workout-table tbody tr:nth-child(even) {
+    background: var(--table-stripe);
+}
+
+.workout-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.workout-name {
+    font-weight: 500;
+    color: var(--text);
+}
+
+/* ============================================================
+   Chat
+   ============================================================ */
+.chat-form {
+    margin-bottom: 0.5rem;
+}
+
+.chat-input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chat-input-row input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--input-border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.chat-input-row input::placeholder {
+    color: var(--text-muted);
+}
+
+.chat-input-row input:focus {
+    border-color: var(--accent);
+}
+
+.chat-input-row button {
+    padding: 0.75rem 1.5rem;
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+}
+
+.chat-input-row button:hover {
+    background: var(--accent-hover);
+}
+
+.chat-response {
+    background: var(--bg-elevated);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-top: 0.85rem;
+}
+
+.chat-answer {
+    white-space: pre-wrap;
+    line-height: 1.65;
+    color: var(--text);
+    font-size: 0.92rem;
+}
+
+/* ============================================================
+   Placeholder / Empty State
+   ============================================================ */
+.placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.88rem;
+    padding: 0.5rem 0;
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 640px) {
+    main {
+        padding: 1rem 0.75rem 2rem;
+    }
+
+    .card {
+        padding: 1rem;
+    }
+
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.65rem;
+    }
+
+    .kpi-card {
+        padding: 0.85rem 0.75rem;
+    }
+
+    .kpi-value {
+        font-size: 1.4rem;
+    }
+
+    .workout-table {
+        font-size: 0.8rem;
+    }
+
+    .workout-table thead th,
+    .workout-table tbody td {
+        padding: 0.5rem 0.4rem;
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .chat-input-row {
+        flex-direction: column;
+    }
+
+    .chat-input-row button {
+        width: 100%;
+    }
+
+    .week-stats {
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .sport-row {
+        font-size: 0.82rem;
+    }
+
+    /* Training Today Mobile */
+    .alternatives-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .primary-title {
+        font-size: 1.3rem !important;
+    }
+}
+
+/* ============================================================
+   Training Today — Hauptbereich
+   ============================================================ */
+
+.training-today-card {
+    border: 1px solid var(--accent);
+    background: linear-gradient(
+        135deg,
+        rgba(99, 102, 241, 0.06) 0%,
+        var(--card-bg) 100%
+    );
+}
+
+.training-today-card h2 {
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    letter-spacing: 0.02em;
+}
+
+/* --- Hauptempfehlung --- */
+.primary-recommendation {
+    background: var(--bg-elevated);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.primary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.primary-sport {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.primary-duration {
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: 600;
+    background: var(--accent-soft);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+}
+
+.primary-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0.5rem 0 0.75rem;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.primary-details {
+    font-size: 0.95rem;
+    color: var(--text);
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* --- Warum heute? --- */
+.why-today {
+    background: rgba(99, 102, 241, 0.05);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.why-today h4 {
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin: 0 0 0.25rem;
+    font-weight: 600;
+}
+
+.why-today p {
+    font-size: 0.9rem;
+    color: var(--text);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* --- Warnung --- */
+.training-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    color: var(--warning);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* --- Alternativen --- */
+.alternatives-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+.alternative-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.alternative-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Kategorie-Färbung */
+.alt-swim {
+    border-color: rgba(56, 189, 248, 0.3);
+}
+.alt-swim:hover {
+    border-color: rgba(56, 189, 248, 0.6);
+}
+
+.alt-hard {
+    border-color: rgba(239, 68, 68, 0.25);
+}
+.alt-hard:hover {
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.alt-easy {
+    border-color: rgba(34, 197, 94, 0.25);
+}
+.alt-easy:hover {
+    border-color: rgba(34, 197, 94, 0.5);
+}
+
+.alt-emoji {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.alt-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.alt-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.alt-duration {
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.alt-details {
+    font-size: 0.85rem;
+    color: var(--text);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.alt-unavailable {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.alternative-card.unavailable {
+    opacity: 0.5;
+    filter: grayscale(0.5);
+}

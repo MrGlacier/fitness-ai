@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness AI · Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="header-main">
+                <h1>Fitness AI</h1>
+                <span class="header-subtitle">Dein Trainings-Dashboard</span>
+            </div>
+            {% if training_status or week_stats or last_workouts %}
+                <span class="api-status" title="API verbunden">
+                    <span class="api-dot"></span>
+                    Verbunden
+                </span>
+            {% else %}
+                <span class="api-status api-disconnected" title="API nicht erreichbar">
+                    <span class="api-dot api-dot-error"></span>
+                    Getrennt
+                </span>
+            {% endif %}
+        </div>
+    </header>
+
+    <main>
+        <!-- Training heute -->
+        <section class="card card-highlight training-today-card">
+            <h2>🎯 Training heute</h2>
+            <div class="training-today-content">
+                {% if training_today and not training_today.get('error') and training_today.get('primary') %}
+                    <!-- Hauptempfehlung -->
+                    {% set p = training_today.primary %}
+                    <div class="primary-recommendation">
+                        <div class="primary-header">
+                            <span class="primary-sport">
+                                {% if p.sport == 'Run' %}🏃
+                                {% elif p.sport == 'Ride' %}🚴
+                                {% elif p.sport == 'Swim' %}🏊
+                                {% else %}🏃{% endif %}
+                                {{ p.sport|capitalize }} · {{ p.type|capitalize }}
+                            </span>
+                            <span class="primary-duration">⏱️ {{ p.duration_min }} min</span>
+                        </div>
+                        <h3 class="primary-title">{{ p.title }}</h3>
+                        <p class="primary-details">{{ p.details }}</p>
+                    </div>
+
+                    <!-- Warum heute? -->
+                    {% if training_today.reason %}
+                    <div class="why-today">
+                        <h4>💡 Warum heute?</h4>
+                        <p>{{ training_today.reason }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Warnung -->
+                    {% if training_today.warning %}
+                    <div class="training-warning">
+                        ⚠️ {{ training_today.warning }}
+                    </div>
+                    {% endif %}
+
+                    <!-- Alternativen -->
+                    <div class="alternatives-grid">
+                        {% for alt in training_today.alternatives %}
+                        <div class="alternative-card alt-{{ alt.category }}{% if not alt.available %} unavailable{% endif %}">
+                            {% if alt.category == 'swim' %}
+                                <span class="alt-emoji">🏊</span>
+                                <span class="alt-label">SCHWIMMEN</span>
+                            {% elif alt.category == 'hard' %}
+                                <span class="alt-emoji">🔥</span>
+                                <span class="alt-label">BALLERN</span>
+                            {% elif alt.category == 'easy' %}
+                                <span class="alt-emoji">🌿</span>
+                                <span class="alt-label">LOCKER</span>
+                            {% else %}
+                                <span class="alt-emoji">🏃</span>
+                                <span class="alt-label">{{ alt.category|upper }}</span>
+                            {% endif %}
+
+                            {% if alt.available %}
+                                <p class="alt-title">{{ alt.title }}</p>
+                                <span class="alt-duration">⏱️ {{ alt.duration_min }} min</span>
+                                <p class="alt-details">{{ alt.details }}</p>
+                            {% else %}
+                                <p class="alt-unavailable">
+                                    Nicht verfügbar: {{ alt.unavailable_reason or 'Aktuell nicht empfohlen' }}
+                                </p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                {% elif training_today and training_today.get('error') %}
+                    <p class="placeholder">
+                        Trainingsempfehlung aktuell nicht verfügbar.
+                        <br><small>{{ training_today.error }}</small>
+                    </p>
+                {% else %}
+                    <p class="placeholder">
+                        Trainingsempfehlung wird vorbereitet…
+                    </p>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Aktuelle Fitnesswerte -->
+        <section class="card">
+            <h2>Aktuelle Fitnesswerte</h2>
+            {% if training_status %}
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <span class="kpi-label">Fitness</span>
+                        <span class="kpi-value">{{ training_status.get('ctl')|default('?') }}</span>
+                        <span class="kpi-unit">CTL</span>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Fatigue</span>
+                        <span class="kpi-value">{{ training_status.get('atl')|default('?') }}</span>
+                        <span class="kpi-unit">ATL</span>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Form</span>
+                        <span class="kpi-value">{{ training_status.get('form')|default('?') }}</span>
+                    </div>
+                    {% if training_status.get('resting_hr') %}
+                    <div class="kpi-card">
+                        <span class="kpi-label">Ruhepuls</span>
+                        <span class="kpi-value">{{ training_status.resting_hr }}</span>
+                        <span class="kpi-unit">bpm</span>
+                    </div>
+                    {% endif %}
+                    {% if training_status.get('hrv') %}
+                    <div class="kpi-card">
+                        <span class="kpi-label">HRV</span>
+                        <span class="kpi-value">{{ training_status.hrv|default('?') }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <p class="placeholder">Keine Fitnesswerte verfugbar.</p>
+            {% endif %}
+        </section>
+
+        <!-- Letzte 7 Tage -->
+        <section class="card">
+            <h2>Letzte 7 Tage</h2>
+            {% if week_stats %}
+                <div class="week-overview">
+                    <div class="week-stats">
+                        <span class="week-stat">{{ week_stats.get('total_sessions', 0) }} Einheiten</span>
+                        <span class="week-stat">{{ week_stats.get('total_duration', '—')|format_duration_short }}</span>
+                        <span class="week-stat tss">TSS: {{ week_stats.get('total_tss', 0) }}</span>
+                    </div>
+                    {% if week_stats.get('by_sport') %}
+                    <div class="sport-list">
+                        {% for sport, data in week_stats.by_sport.items() %}
+                        <div class="sport-row">
+                            <span class="sport-name">{{ sport }}</span>
+                            <span class="sport-detail">{{ data.count }}x · {{ data.duration_sec|format_duration_short }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <p class="placeholder">Keine Daten fur die letzten 7 Tage verfugbar.</p>
+            {% endif %}
+        </section>
+
+        <!-- Letzte Aktivitaten -->
+        <section class="card">
+            <h2>Letzte Aktivitaten</h2>
+            {% if last_workouts %}
+                <div class="table-wrapper">
+                    <table class="workout-table">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Name</th>
+                                <th>Sportart</th>
+                                <th>Distanz</th>
+                                <th>Dauer</th>
+                                <th>TSS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for w in last_workouts %}
+                            <tr>
+                                <td>{{ w.get('date', '?') }}</td>
+                                <td class="workout-name">{{ w.get('name', '?') }}</td>
+                                <td>{{ w.get('sport', '?') }}</td>
+                                <td>{{ w.get('distance_km')|default('?') }} km</td>
+                                <td>{{ w.get('duration_sec')|default(0)|format_duration }}</td>
+                                <td>{{ w.get('tss')|default('?') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="placeholder">Keine Aktivitaten verfugbar.</p>
+            {% endif %}
+        </section>
+
+        <!-- Chat -->
+        <section class="card">
+            <h2>Frag deine Fitness-AI</h2>
+            <form method="post" action="/dashboard/chat" class="chat-form">
+                <div class="chat-input-row">
+                    <input
+                        type="text"
+                        name="question"
+                        placeholder="z.B. Wie war mein letzter Lauf?"
+                        autofocus
+                    >
+                    <button type="submit">Senden</button>
+                </div>
+            </form>
+            {% if chat_answer is not none %}
+            <div class="chat-response">
+                <div class="chat-answer">{{ chat_answer }}</div>
+            </div>
+            {% endif %}
+        </section>
+    </main>
+
+    <footer>
+        <p>Fitness AI Dashboard · V1</p>
+    </footer>
+</body>
+</html>

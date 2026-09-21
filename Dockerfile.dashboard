@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
+COPY dashboard/ ./dashboard/
+COPY fitness/ ./fitness/
+COPY intervals/ ./intervals/
+COPY core/ ./core/
+COPY llm/ ./llm/
+COPY connectors/ ./connectors/
+
+RUN uv sync --frozen --no-dev
+
+EXPOSE 8081
+
+CMD ["uv", "run", "gunicorn", "dashboard.app:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8081"]
