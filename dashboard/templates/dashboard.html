@@ -31,81 +31,8 @@
         <!-- Training heute -->
         <section class="card card-highlight training-today-card">
             <h2>🎯 Training heute</h2>
-            <div class="training-today-content">
-                {% if training_today and not training_today.get('error') and training_today.get('primary') %}
-                    <!-- Hauptempfehlung -->
-                    {% set p = training_today.primary %}
-                    <div class="primary-recommendation">
-                        <div class="primary-header">
-                            <span class="primary-sport">
-                                {% if p.sport == 'Run' %}🏃
-                                {% elif p.sport == 'Ride' %}🚴
-                                {% elif p.sport == 'Swim' %}🏊
-                                {% else %}🏃{% endif %}
-                                {{ p.sport|capitalize }} · {{ p.type|capitalize }}
-                            </span>
-                            <span class="primary-duration">⏱️ {{ p.duration_min }} min</span>
-                        </div>
-                        <h3 class="primary-title">{{ p.title }}</h3>
-                        <p class="primary-details">{{ p.details }}</p>
-                    </div>
-
-                    <!-- Warum heute? -->
-                    {% if training_today.reason %}
-                    <div class="why-today">
-                        <h4>💡 Warum heute?</h4>
-                        <p>{{ training_today.reason }}</p>
-                    </div>
-                    {% endif %}
-
-                    <!-- Warnung -->
-                    {% if training_today.warning %}
-                    <div class="training-warning">
-                        ⚠️ {{ training_today.warning }}
-                    </div>
-                    {% endif %}
-
-                    <!-- Alternativen -->
-                    <div class="alternatives-grid">
-                        {% for alt in training_today.alternatives %}
-                        <div class="alternative-card alt-{{ alt.category }}{% if not alt.available %} unavailable{% endif %}">
-                            {% if alt.category == 'swim' %}
-                                <span class="alt-emoji">🏊</span>
-                                <span class="alt-label">SCHWIMMEN</span>
-                            {% elif alt.category == 'hard' %}
-                                <span class="alt-emoji">🔥</span>
-                                <span class="alt-label">BALLERN</span>
-                            {% elif alt.category == 'easy' %}
-                                <span class="alt-emoji">🌿</span>
-                                <span class="alt-label">LOCKER</span>
-                            {% else %}
-                                <span class="alt-emoji">🏃</span>
-                                <span class="alt-label">{{ alt.category|upper }}</span>
-                            {% endif %}
-
-                            {% if alt.available %}
-                                <p class="alt-title">{{ alt.title }}</p>
-                                <span class="alt-duration">⏱️ {{ alt.duration_min }} min</span>
-                                <p class="alt-details">{{ alt.details }}</p>
-                            {% else %}
-                                <p class="alt-unavailable">
-                                    Nicht verfügbar: {{ alt.unavailable_reason or 'Aktuell nicht empfohlen' }}
-                                </p>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-
-                {% elif training_today and training_today.get('error') %}
-                    <p class="placeholder">
-                        Trainingsempfehlung aktuell nicht verfügbar.
-                        <br><small>{{ training_today.error }}</small>
-                    </p>
-                {% else %}
-                    <p class="placeholder">
-                        Trainingsempfehlung wird vorbereitet…
-                    </p>
-                {% endif %}
+            <div class="training-today-content" id="training-today-content">
+                <p class="placeholder">Trainingsempfehlung wird vorbereitet…</p>
             </div>
         </section>
 
@@ -233,5 +160,6 @@
     <footer>
         <p>Fitness AI Dashboard · V1</p>
     </footer>
+    <script src="/static/dashboard.js"></script>
 </body>
 </html>

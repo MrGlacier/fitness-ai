@@ -88,6 +88,43 @@ class DashboardRouteTests(unittest.TestCase):
 
         response = self._get_dashboard()
         self.assertEqual(response.status_code, 200)
+        mock_client.post.assert_not_called()
+
+    @patch("dashboard.routes._api_client")
+    def test_training_today_is_loaded_separately(self, mock_client):
+        """Die langsame Empfehlung blockiert nicht den initialen Seitenaufruf."""
+        training_response = MagicMock()
+        training_response.json.return_value = {
+            "success": True,
+            "data": {
+                "primary": {
+                    "sport": "Run",
+                    "type": "easy",
+                    "title": "Lockerer Lauf",
+                    "duration_min": 40,
+                    "details": "Ruhig laufen.",
+                },
+                "alternatives": [],
+                "reason": "Passt zum Gesamtbild.",
+                "warning": None,
+            },
+        }
+        mock_client.post.return_value = training_response
+
+        response = routes.dashboard_training_today(self._request())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Lockerer Lauf", response.body.decode())
+        mock_client.post.assert_called_once()
+
+    def test_dashboard_healthcheck_has_no_external_dependency(self):
+        """Der Container-Healthcheck ruft weder Fitness API noch LLM auf."""
+        from dashboard.app import health
+
+        self.assertEqual(
+            health(),
+            {"status": "ok", "service": "fitness-ai-dashboard"},
+        )
 
     @patch("dashboard.routes._api_client")
     def test_dashboard_contains_key_sections(self, mock_client):

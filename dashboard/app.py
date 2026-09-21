@@ -12,6 +12,12 @@ app = FastAPI(
     version="0.1.0",
 )
 
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Leichter Healthcheck ohne Abhängigkeit von API oder LLM."""
+    return {"status": "ok", "service": "fitness-ai-dashboard"}
+
 # Statische Dateien (CSS, JS, Bilder) ausliefern
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 

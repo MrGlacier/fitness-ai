@@ -16,4 +16,7 @@ RUN uv sync --frozen --no-dev
 
 EXPOSE 8081
 
-CMD ["uv", "run", "gunicorn", "dashboard.app:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8081"]
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=2)"]
+
+CMD ["uv", "run", "gunicorn", "dashboard.app:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8081", "--timeout", "190"]

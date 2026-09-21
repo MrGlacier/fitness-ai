@@ -112,7 +112,6 @@ def _safe_training_today() -> dict:
 def dashboard_index(request: Request):
     """Hauptseite des Dashboards."""
     summary = _safe_summary()
-    training_today = _safe_training_today()
 
     training_status = summary.get("training_status")
     last_workouts = summary.get("last_workouts", [])[:5]
@@ -123,8 +122,18 @@ def dashboard_index(request: Request):
         training_status=training_status,
         last_workouts=last_workouts,
         week_stats=week_stats,
-        training_today=training_today,
     )
+
+
+@app.get("/dashboard/training-today", response_class=HTMLResponse)
+def dashboard_training_today(request: Request):
+    """Lädt die langsame LLM-Empfehlung getrennt von der Hauptseite."""
+    template = templates.get_template("training_today.html")
+    html = template.render(
+        request=request,
+        training_today=_safe_training_today(),
+    )
+    return HTMLResponse(content=html)
 
 
 # ------------------------------------------------------------------ #
