@@ -32,6 +32,18 @@ class LlmClientResponseTests(unittest.TestCase):
         with self.assertRaisesRegex(LlmResponseError, "keine Auswahl"):
             self.client.ask("Test")
 
+    def test_ask_forwards_request_timeout(self):
+        self.client._post = Mock(return_value={
+            "choices": [{
+                "message": {"content": "ok"},
+                "finish_reason": "stop",
+            }],
+        })
+
+        self.client.ask("Test", timeout=12.0)
+
+        self.assertEqual(self.client._post.call_args.kwargs["timeout"], 12.0)
+
     def test_ask_rejects_empty_content_instead_of_using_reasoning(self):
         self.client._post = Mock(return_value={
             "choices": [{
