@@ -23,6 +23,7 @@ intervals_icu_endpoints = {
     "athlete": "/athlete/{athlete_id}",
     "sport-settings": "/athlete/{athlete_id}/sport-settings/{sport_type}",
     "activities": "/athlete/{athlete_id}/activities",
+    "activity-search": "/athlete/{athlete_id}/activities/search-full",
     "activity-details": "/activity/{activity_id}",
     "activity-streams": "/activity/{activity_id}/streams.json",
     "training-status": "/athlete/{athlete_id}/wellness/{for_date}",
@@ -32,6 +33,7 @@ WORKOUT_STREAM_TYPES = (
     "time,distance,heartrate,watts,cadence,altitude,"
     "velocity_smooth,moving"
 )
+MAX_ACTIVITY_SEARCH_RESULTS = 50
 
 
 class IntervalsClient:
@@ -165,40 +167,40 @@ class IntervalsClient:
         limit: int = 50,
     ) -> list[Workout]:
         """Lädt Aktivitäten und filtert client-seitig nach Name (case-insensitive Teilsuche)."""
-        endpoint = intervals_icu_endpoints["activities"].format(athlete_id=self.athlete_id)
-        query_string = {"oldest": date(2020, 1, 1)}
-        query_string["newest"] = date.today()
-
-        data = self._get(endpoint, query_string)
-
-        search_lower = search_term.strip().lower()
-        if not search_lower:
+        search_normalized = (search_term or "").strip().casefold()
+        if not search_normalized or limit <= 0:
             return []
+
+        effective_limit = min(limit, MAX_ACTIVITY_SEARCH_RESULTS)
+        endpoint = intervals_icu_endpoints["activity-search"].format(
+            athlete_id=self.athlete_id,
+        )
+        data = self._get(
+            endpoint,
+            {"q": search_term.strip(), "limit": effective_limit},
+        )
 
         # Client-seitige Namensfilterung (case-insensitive, Teiltreffer)
         filtered = [
             activity
             for activity in data
-            if search_lower in str(activity.get("name", "") or "").lower()
+            if search_normalized
+            in str(activity.get("name", "") or "").casefold()
         ]
 
         # Optional nach Sportart filtern
-        if sport_type:
-            sport_lower = sport_type.lower()
+        sport_normalized = (sport_type or "").strip().casefold()
+        if sport_normalized:
             filtered = [
                 activity
                 for activity in filtered
-                if str(activity.get("type", "")).lower() == sport_lower
+                if str(activity.get("type", "")).casefold() == sport_normalized
             ]
 
-        results = []
-        for activity in filtered:
-            converted_activity = self._map_activity_to_workout(activity)
-            results.append(converted_activity)
-            if len(results) >= limit:
-                break
+        results = [self._map_activity_to_workout(activity) for activity in filtered]
+        results.sort(key=lambda workout: workout.start_time, reverse=True)
 
-        return results
+        return results[:effective_limit]
 
 
     def get_activity_streams(self, activity_id: str) -> dict[str, list]:

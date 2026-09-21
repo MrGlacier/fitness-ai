@@ -108,6 +108,25 @@ class ActivitySearchTests(unittest.TestCase):
                 "icu_rpe": 7,
                 "description": None,
             },
+            {
+                "id": "6",
+                "name": "Historischer Stadtlauf",
+                "type": "Run",
+                "start_date": "2015-04-12T08:30:00",
+                "distance": 10000,
+                "moving_time": 3900,
+                "average_heartrate": 158,
+                "max_heartrate": 175,
+                "icu_training_load": 65,
+                "icu_intensity": 70,
+                "icu_weighted_avg_watts": None,
+                "average_cadence": 86,
+                "total_elevation_gain": 80,
+                "decoupling": None,
+                "icu_variability_index": None,
+                "icu_rpe": 7,
+                "description": None,
+            },
         ]
 
     def test_exact_match(self):
@@ -116,12 +135,63 @@ class ActivitySearchTests(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].id, "1")
 
+    def test_uses_full_history_search_endpoint_without_date_limit(self):
+        calls = []
+
+        def fake_get(endpoint, query_string=None):
+            calls.append((endpoint, query_string))
+            return self._fake_activities()
+
+        self.client._get = fake_get
+
+        self.client.get_activities_by_name("Einstein")
+
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "/athlete/test-athlete/activities/search-full",
+                    {"q": "Einstein", "limit": 50},
+                )
+            ],
+        )
+
+    def test_passes_requested_limit_to_search_endpoint(self):
+        calls = []
+
+        def fake_get(endpoint, query_string=None):
+            calls.append((endpoint, query_string))
+            return self._fake_activities()
+
+        self.client._get = fake_get
+
+        self.client.get_activities_by_name("Einstein", limit=2)
+
+        self.assertEqual(calls[0][1], {"q": "Einstein", "limit": 2})
+
+    def test_finds_activity_before_2020(self):
+        self.client._get = lambda endpoint, query_string=None: self._fake_activities()
+
+        results = self.client.get_activities_by_name("Historischer Stadtlauf")
+
+        self.assertEqual([result.id for result in results], ["6"])
+        self.assertLess(results[0].start_time.year, 2020)
+
     def test_case_insensitive_partial_match(self):
         self.client._get = lambda endpoint, query_string=None: self._fake_activities()
         results = self.client.get_activities_by_name("einstein")
         self.assertEqual(len(results), 3)
         ids = {r.id for r in results}
         self.assertEqual(ids, {"1", "2", "5"})
+
+    def test_case_insensitive_uses_unicode_casefolding(self):
+        activities = self._fake_activities()
+        activities[0]["name"] = "Straßenlauf"
+        self.client._get = lambda endpoint, query_string=None: activities
+
+        results = self.client.get_activities_by_name("STRASSEN")
+
+        self.assertEqual([result.id for result in results], ["1"])
 
     def test_partial_match_other_activity(self):
         self.client._get = lambda endpoint, query_string=None: self._fake_activities()
@@ -135,7 +205,9 @@ class ActivitySearchTests(unittest.TestCase):
         self.assertEqual(results, [])
 
     def test_empty_search_term(self):
-        self.client._get = lambda endpoint, query_string=None: self._fake_activities()
+        self.client._get = lambda endpoint, query_string=None: self.fail(
+            "Für einen leeren Suchbegriff darf die API nicht aufgerufen werden."
+        )
         results = self.client.get_activities_by_name("")
         self.assertEqual(results, [])
 
@@ -151,7 +223,7 @@ class ActivitySearchTests(unittest.TestCase):
 
     def test_sport_type_filter_matches(self):
         self.client._get = lambda endpoint, query_string=None: self._fake_activities()
-        results = self.client.get_activities_by_name("Kaiserkrone", sport_type="Run")
+        results = self.client.get_activities_by_name("Kaiserkrone", sport_type=" run ")
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].id, "4")
 
@@ -159,6 +231,35 @@ class ActivitySearchTests(unittest.TestCase):
         self.client._get = lambda endpoint, query_string=None: self._fake_activities()
         results = self.client.get_activities_by_name("Einstein", limit=2)
         self.assertEqual(len(results), 2)
+
+    def test_non_positive_limit_skips_api_request(self):
+        self.client._get = lambda endpoint, query_string=None: self.fail(
+            "Bei einem nicht positiven Limit darf die API nicht aufgerufen werden."
+        )
+
+        self.assertEqual(self.client.get_activities_by_name("Einstein", limit=0), [])
+        self.assertEqual(self.client.get_activities_by_name("Einstein", limit=-1), [])
+
+    def test_limit_is_capped_for_llm_context(self):
+        activities = []
+        for index in range(60):
+            activity = self._fake_activities()[0]
+            activity["id"] = str(index)
+            activities.append(activity)
+        self.client._get = lambda endpoint, query_string=None: activities
+
+        results = self.client.get_activities_by_name("Einstein", limit=100)
+
+        self.assertEqual(len(results), 50)
+
+    def test_returns_newest_matches_first_before_applying_limit(self):
+        self.client._get = lambda endpoint, query_string=None: list(
+            reversed(self._fake_activities())
+        )
+
+        results = self.client.get_activities_by_name("Einstein", limit=2)
+
+        self.assertEqual([result.id for result in results], ["1", "2"])
 
     def test_returns_workout_objects(self):
         self.client._get = lambda endpoint, query_string=None: self._fake_activities()
