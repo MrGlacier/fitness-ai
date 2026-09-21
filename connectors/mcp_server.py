@@ -65,6 +65,11 @@ def calculate_bmi(height: int, weight: float) -> float:
     return round(bmi, 2)
 
 @mcp.tool()
+def get_upcoming_events(days_ahead: int = 30) -> list[dict]:
+    """Liefert geplante Wettkämpfe des Athleten für die nächsten N Tage als Trainingskontext."""
+    return intervals_client_instance.get_upcoming_events(days_ahead)
+
+@mcp.tool()
 def test_intervals_connection() -> dict:
     """Prüft die Verbindung zur Intervals.icu API und gibt den konfigurierten Athleten zurück."""
     return intervals_client_instance.test_connection()

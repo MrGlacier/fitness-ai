@@ -648,6 +648,79 @@ class IntervalsClient:
             elevation_gain=elevation_gain,
         )
 
+    def get_upcoming_events(
+        self,
+        days_ahead: int = 30,
+        reference_date: date | None = None,
+    ) -> list[dict]:
+        """Liefert geplante Wettkämpfe des Athleten für die nächsten N Tage.
+
+        Gibt eine Liste von Event-Dictionaries zurück. Jedes Dict enthält:
+        - id: str
+        - name: str
+        - date: str (ISO-Datum)
+        - sport: str | None
+        - distance: float | None
+        - distance_unit: str | None
+
+        Andere Kalendereinträge werden bewusst nicht als Wettkampfkontext
+        an die Trainingsempfehlung weitergegeben.
+        """
+        endpoint = f"/athlete/{self.athlete_id}/events"
+        today = reference_date or date.today()
+        max_date = today + timedelta(days=days_ahead)
+        query_string: dict[str, Any] = {
+            "oldest": today.isoformat(),
+            "newest": max_date.isoformat(),
+        }
+        try:
+            raw_events = self._get(endpoint, query_string)
+        except Exception:
+            logger.warning("Konnte keine Events von Intervals.icu abrufen")
+            return []
+
+        if not isinstance(raw_events, list):
+            logger.warning("Events-Antwort von Intervals.icu ist keine Liste: %s", type(raw_events).__name__)
+            return []
+
+        events: list[dict] = []
+        for raw in raw_events:
+            if not isinstance(raw, dict):
+                continue
+
+            category = str(raw.get("category", "")).upper()
+            if not category.startswith("RACE_"):
+                continue
+
+            # Event-Datum extrahieren
+            event_date_str = raw.get("start_date_local") or raw.get("date")
+            if not event_date_str:
+                continue
+
+            try:
+                event_date = date.fromisoformat(str(event_date_str)[:10])
+            except (ValueError, TypeError):
+                continue
+
+            # Nur zukünftige Events im gewünschten Zeitraum
+            if event_date < today or event_date > max_date:
+                continue
+
+            events.append({
+                "id": str(raw.get("id", "")),
+                "name": str(raw.get("name", "Unbekanntes Event")),
+                "date": event_date.isoformat(),
+                "distance_days": (event_date - today).days,
+                "category": category,
+                "sport": raw.get("type") or raw.get("sport"),
+                "distance": raw.get("distance"),
+                "distance_unit": raw.get("distance_unit"),
+            })
+
+        # Nach Datum sortieren (nächste zuerst)
+        events.sort(key=lambda e: e["distance_days"])
+        return events
+
     def _stream_average(
         self,
         stream: list | None,
