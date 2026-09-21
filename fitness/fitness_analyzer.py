@@ -21,6 +21,33 @@ class FitnessAnalyzer:
     def __init__(self, intervals_client):
         self.intervals_client_instance = intervals_client
 
+    def search_activities_by_name(
+        self,
+        search_term: str,
+        sport_type: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Sucht Aktivitäten nach Namen und gibt kompakte Ergebnisse für das LLM zurück."""
+        workouts = self.intervals_client_instance.get_activities_by_name(
+            search_term, sport_type, limit
+        )
+
+        compact = []
+        for w in workouts:
+            compact.append({
+                "id": w.id,
+                "name": w.name,
+                "sport": w.sport,
+                "start_time": w.start_time.isoformat() if w.start_time else None,
+                "distance_km": w.distance_km,
+                "duration_sec": w.duration_sec,
+                "avg_hr": w.avg_hr,
+                "avg_watts": w.weighted_avg_watts,
+                "tss": w.tss,
+            })
+
+        return compact
+
     def get_current_ftp(self, sport_type: str | None = None) -> dict:
         training_zones = self.intervals_client_instance.get_training_zones(sport_type)
 

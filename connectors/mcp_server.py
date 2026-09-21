@@ -74,5 +74,14 @@ def get_activity_detail(activity_id: str) -> dict:
     """Liefert eine einzelne Aktivität mit Stream-Statistiken (HR, Leistung, Pace etc.) und Splits. activity_id ist die ID der Aktivität in Intervals.icu."""
     return fitness_analyzer_instance.get_activity_detail(activity_id)
 
+@mcp.tool()
+def search_activities_by_name(
+    search_term: str,
+    sport_type: str | None = None,
+    limit: int = 50,
+) -> list[dict]:
+    """Sucht Aktivitäten nach einem Suchbegriff im Namen (case-insensitive Teilsuche). Optional nach Sportart filtern. Limitiert die Anzahl der Treffer."""
+    return fitness_analyzer_instance.search_activities_by_name(search_term, sport_type, limit)
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")

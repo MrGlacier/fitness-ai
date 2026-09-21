@@ -158,6 +158,48 @@ class IntervalsClient:
 
         return results
 
+    def get_activities_by_name(
+        self,
+        search_term: str,
+        sport_type: str | None = None,
+        limit: int = 50,
+    ) -> list[Workout]:
+        """Lädt Aktivitäten und filtert client-seitig nach Name (case-insensitive Teilsuche)."""
+        endpoint = intervals_icu_endpoints["activities"].format(athlete_id=self.athlete_id)
+        query_string = {"oldest": date(2020, 1, 1)}
+        query_string["newest"] = date.today()
+
+        data = self._get(endpoint, query_string)
+
+        search_lower = search_term.strip().lower()
+        if not search_lower:
+            return []
+
+        # Client-seitige Namensfilterung (case-insensitive, Teiltreffer)
+        filtered = [
+            activity
+            for activity in data
+            if search_lower in str(activity.get("name", "") or "").lower()
+        ]
+
+        # Optional nach Sportart filtern
+        if sport_type:
+            sport_lower = sport_type.lower()
+            filtered = [
+                activity
+                for activity in filtered
+                if str(activity.get("type", "")).lower() == sport_lower
+            ]
+
+        results = []
+        for activity in filtered:
+            converted_activity = self._map_activity_to_workout(activity)
+            results.append(converted_activity)
+            if len(results) >= limit:
+                break
+
+        return results
+
 
     def get_activity_streams(self, activity_id: str) -> dict[str, list]:
         """Lädt Roh-Streams für eine Aktivität und gibt sie als transponiertes Dict zurück."""
