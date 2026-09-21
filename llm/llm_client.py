@@ -40,6 +40,7 @@ class LlmClient:
         system_prompt=None,
         max_tokens: int | None = None,
         step_name: str = "LLM",
+        timeout: float | httpx.Timeout | None = None,
     ) -> dict:
         endpoint = llm_endpoints["completions"]
         post_data: dict = {
@@ -63,7 +64,12 @@ class LlmClient:
         if max_tokens is not None:
             post_data["max_tokens"] = max_tokens
 
-        answer = self._post(endpoint, post_data, step_name=step_name)
+        answer = self._post(
+            endpoint,
+            post_data,
+            step_name=step_name,
+            timeout=timeout,
+        )
 
         choices = answer.get("choices")
         if not isinstance(choices, list) or not choices:
@@ -118,10 +124,18 @@ class LlmClient:
         url: str,
         post_data: dict | None = None,
         step_name: str = "LLM",
+        timeout: float | httpx.Timeout | None = None,
     ) -> dict:
         try:
             start = time.perf_counter()
-            response = self.httpx_client.post(url, json=post_data)
+            if timeout is None:
+                response = self.httpx_client.post(url, json=post_data)
+            else:
+                response = self.httpx_client.post(
+                    url,
+                    json=post_data,
+                    timeout=timeout,
+                )
             duration = time.perf_counter() - start
             response.raise_for_status()
             try:

@@ -1,10 +1,13 @@
 import json
 import time
+from datetime import date, timedelta
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
+from fitness.models import TrainingTodayRecommendation
 from llm.llm_client import LlmClient
+from llm.prompts import TRAINING_TODAY_SYSTEM_PROMPT
 from connectors.mcp_client import McpClient
 
 from core.logger import logger
@@ -35,9 +38,11 @@ class FitnessAgent:
         self,
         llm_client_instance: LlmClient,
         mcp_client_instance: McpClient,
+        analyzer: Any = None,
     ):
         self.llm_client_instance = llm_client_instance
         self.mcp_client_instance = mcp_client_instance
+        self._analyzer = analyzer
 
         self.ask_for_tool_prompt = """
 /no_think
@@ -446,6 +451,176 @@ Antwort:
         )
 
         return answer["answer"]
+
+    def get_training_today_recommendation(
+        self,
+        for_date: date | None = None,
+    ) -> TrainingTodayRecommendation:
+        """Erzeugt eine strukturierte Trainingsempfehlung für heute."""
+        if for_date is None:
+            for_date = date.today()
+
+        data: dict[str, Any] = {}
+
+        # TrainingStatus
+        try:
+            status = self._analyzer.get_current_training_status(for_date)
+            if status is not None:
+                data["training_status"] = {
+                    "ctl": status.ctl,
+                    "atl": status.atl,
+                    "form": status.form,
+                    "form_status": status.form_status,
+                    "summary": status.summary,
+                    "resting_hr": status.resting_hr,
+                    "hrv": status.hrv,
+                    "sleep_secs": status.sleep_secs,
+                    "sleep_quality": status.sleep_quality,
+                    "sleep_score": status.sleep_score,
+                    "readiness": status.readiness,
+                }
+            else:
+                data["training_status"] = None
+        except Exception:
+            logger.exception("[TRAINING-TODAY] Fehler beim TrainingStatus")
+            data["training_status"] = None
+
+        # Aktivitäten einmal laden und sowohl für den 14-Tage-Verlauf als auch
+        # für die letzte Einheit je Sportart verwenden.
+        recent_activities = []
+        try:
+            recent_activities = self._analyzer.intervals_client_instance.get_workouts(
+                from_date=for_date - timedelta(days=30),
+                to_date=for_date,
+            )
+            recent = [
+                workout
+                for workout in recent_activities
+                if workout.start_time.date() >= for_date - timedelta(days=14)
+            ]
+            data["recent_workouts"] = [
+                {
+                    "date": w.start_time.strftime("%Y-%m-%d") if w.start_time else "?",
+                    "sport": w.sport,
+                    "duration_min": round(w.duration_sec / 60) if w.duration_sec else None,
+                    "tss": w.tss,
+                    "intensity": w.intensity,
+                    "rpe": w.rpe,
+                    "name": w.name,
+                }
+                for w in recent
+            ]
+        except Exception:
+            logger.exception("[TRAINING-TODAY] Fehler bei recent workouts")
+            data["recent_workouts"] = []
+
+        # Letzte Einheit pro Sportart
+        for sport in ("run", "ride", "swim"):
+            matching = [w for w in recent_activities if w.sport.casefold() == sport]
+            last = max(matching, key=lambda w: w.start_time) if matching else None
+            data[f"last_{sport}"] = {
+                "date": last.start_time.strftime("%Y-%m-%d") if last else None,
+                "sport": last.sport if last else None,
+                "duration_min": round(last.duration_sec / 60) if last and last.duration_sec else None,
+                "tss": last.tss if last else None,
+                "intensity": last.intensity if last else None,
+                "name": last.name if last else None,
+            } if last else None
+
+        # FTP
+        try:
+            ftp_data: dict[str, Any] = {}
+            for sport in ("run", "ride", "swim"):
+                ftp = self._analyzer.get_current_ftp(sport)
+                ftp_data[sport] = ftp
+            data["ftp"] = ftp_data
+        except Exception:
+            logger.exception("[TRAINING-TODAY] Fehler bei FTP")
+            data["ftp"] = {}
+
+        # Upcoming Events
+        try:
+            events = self._analyzer.intervals_client_instance.get_upcoming_events(
+                21,
+                reference_date=for_date,
+            )
+            data["upcoming_events"] = events
+        except Exception:
+            logger.warning("[TRAINING-TODAY] Konnte keine Events abrufen")
+            data["upcoming_events"] = []
+
+        # Kompakten Daten-Prompt bauen
+        data_text = json.dumps(
+            data,
+            ensure_ascii=False,
+            default=str,
+            separators=(",", ":"),
+        )
+
+        user_prompt = (
+            "Hier sind die aktuellen Trainingsdaten des Athleten:\n\n"
+            f"```\n{data_text}\n```\n\n"
+            "Erstelle daraus eine personalisierte Trainingsempfehlung für heute.\n"
+            "Bewerte ATL nur zusammen mit CTL, Form, Trainingsverlauf, Erholungswerten und Wettkampfkontext. "
+            "Begründe Einschränkungen nicht mit einer einzelnen Kennzahl."
+        )
+
+        # LLM befragen mit Retry-Logik
+        max_retries = 2
+        last_error: str | None = None
+
+        retry_prompt = user_prompt
+        for attempt in range(max_retries + 1):
+            try:
+                answer = self.llm_client_instance.ask(
+                    question=retry_prompt,
+                    system_prompt=TRAINING_TODAY_SYSTEM_PROMPT,
+                    max_tokens=1500,
+                    step_name="TRAINING-TODAY",
+                    timeout=170.0,
+                )
+                raw_json = answer["answer"].strip()
+
+                # Markdown-Codeblöcke entfernen, falls vorhanden
+                if raw_json.startswith("```"):
+                    raw_json = raw_json[3:]
+                    if raw_json.startswith("json"):
+                        raw_json = raw_json[4:]
+                    raw_json = raw_json.rsplit("```", 1)[0].strip()
+
+                recommendation = TrainingTodayRecommendation.model_validate_json(raw_json)
+                logger.info(
+                    "[TRAINING-TODAY] Empfehlung gültig (Versuch %d/%d)",
+                    attempt + 1,
+                    max_retries + 1,
+                )
+                return recommendation
+
+            except ValidationError as e:
+                last_error = f"Validierungsfehler: {e}"
+                retry_prompt = (
+                    f"{user_prompt}\n\n"
+                    "Die vorherige Antwort war ungültig. Korrigiere die JSON-Antwort "
+                    f"anhand dieses Fehlers: {str(e)[:800]}"
+                )
+                logger.warning(
+                    "[TRAINING-TODAY] Ungültige JSON-Struktur (Versuch %d/%d)",
+                    attempt + 1,
+                    max_retries + 1,
+                )
+            except Exception as e:
+                logger.warning(
+                    "[TRAINING-TODAY] LLM- oder Antwortfehler: %s",
+                    e,
+                )
+                raise RuntimeError(
+                    "[TRAINING-TODAY] Empfehlung konnte nicht erzeugt werden."
+                ) from e
+
+        raise RuntimeError(
+            f"[TRAINING-TODAY] Nach {max_retries + 1} Versuchen kein gültiges JSON. "
+            f"Letzter Fehler: {last_error}"
+        )
 
     async def build_tools_description_for_llm(self) -> list[dict]:
         tools = await self.mcp_client_instance.list_tools()

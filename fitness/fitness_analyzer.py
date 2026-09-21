@@ -96,11 +96,11 @@ class FitnessAnalyzer:
 
         elif training_status.form >= -30:
             training_status.form_status = "stark ermüdet"
-            training_status.summary = "Deine kurzfristige Trainingsbelastung ist sehr hoch. Erholung sollte momentan Priorität haben."
+            training_status.summary = "Deine kurzfristige Trainingsbelastung liegt deutlich über deiner langfristigen Belastung. Berücksichtige dieses Verhältnis zusammen mit den letzten Einheiten und deinen Erholungswerten."
 
         else:
             training_status.form_status = "extrem ermüdet"
-            training_status.summary = "Du befindest dich aktuell in einer sehr hohen Belastungsphase. Erholung ist dringend zu empfehlen."
+            training_status.summary = "Deine kurzfristige Trainingsbelastung liegt aktuell sehr deutlich über deiner langfristigen Belastung. Prüfe vor einer weiteren intensiven Einheit auch die letzten Einheiten und deine Erholungswerte."
 
         return training_status
 

@@ -53,12 +53,20 @@ app = FastAPI(
 # Die API benutzt einfach unseren bestehenden FitnessAgent.
 # ---------------------------------------------------------------------------
 
+# Dashboard: Direkter Zugriff auf Analyzer / Intervals — KEIN LLM
+from intervals import intervals_client as _intervals_client
+from fitness import fitness_analyzer as _fitness_analyzer
+
+intervals_client_instance = _intervals_client.IntervalsClient()
+_analyzer = _fitness_analyzer.FitnessAnalyzer(intervals_client_instance)
+
 mcp_client = McpClient()
 llm_client = LlmClient()
 
 fitness_agent = FitnessAgent(
     llm_client_instance=llm_client,
     mcp_client_instance=mcp_client,
+    analyzer=_analyzer,
 )
 
 
@@ -120,6 +128,135 @@ async def root():
         "status": "ok",
         "service": "fitness-ai",
     }
+
+
+# ---------------------------------------------------------------------------
+# Dashboard-Zusammenfassung
+#
+# Kompakter Endpunkt fur das Dashboard.
+#
+# Verwendet direkt FitnessAnalyzer / IntervalsClient — KEIN LLM,
+# KEIN FitnessAgent, KEIN MCP.
+# ---------------------------------------------------------------------------
+
+from datetime import date, timedelta
+
+
+@app.get("/dashboard/summary")
+def dashboard_summary():
+    """Kompakte Zusammenfassung fur das Dashboard."""
+    today = date.today()
+
+    # --- Trainingsstatus ---
+    training_status = None
+    try:
+        status = _analyzer.get_current_training_status(today)
+        if status is not None:
+            training_status = {
+                "ctl": status.ctl,
+                "atl": status.atl,
+                "form": status.form,
+                "form_status": status.form_status,
+                "summary": status.summary,
+                "resting_hr": status.resting_hr,
+                "hrv": status.hrv,
+                "readiness": status.readiness,
+            }
+    except Exception:
+        logger.exception("[DASHBOARD] Fehler beim Laden des Trainingsstatus")
+
+    # --- Letzte Workouts (30 Tage) ---
+    last_workouts = []
+    recent_workouts = []
+    try:
+        recent_workouts = _analyzer.intervals_client_instance.get_recent_workouts(30)
+        for w in recent_workouts[:5]:
+            last_workouts.append({
+                "date": w.start_time.strftime("%d.%m.%Y") if w.start_time else "?",
+                "name": w.name or "?",
+                "sport": w.sport,
+                "distance_km": round(w.distance_km, 2) if w.distance_km else None,
+                "duration_sec": w.duration_sec,
+                "tss": w.tss,
+            })
+    except Exception:
+        logger.exception("[DASHBOARD] Fehler beim Laden der Workouts")
+
+    # --- 7-Tage-Statistiken ---
+    week_stats = {}
+    try:
+        week_start = today - timedelta(days=7)
+        week_workouts = [
+            workout
+            for workout in recent_workouts
+            if workout.start_time.date() >= week_start
+        ]
+        total_seconds = sum(w.duration_sec for w in week_workouts)
+        total_tss = sum(w.tss or 0 for w in week_workouts)
+
+        by_sport: dict[str, dict] = {}
+        for w in week_workouts:
+            sport = w.sport
+            if sport not in by_sport:
+                by_sport[sport] = {"count": 0, "duration_sec": 0, "tss": 0}
+            by_sport[sport]["count"] += 1
+            by_sport[sport]["duration_sec"] += w.duration_sec
+            by_sport[sport]["tss"] += w.tss or 0
+
+        def fmt_hours(sec: int) -> str:
+            if sec is None:
+                return "?"
+            h, m = divmod(sec, 3600)
+            return f"{h}h {m:02d}m" if h else f"{m}m"
+
+        week_stats = {
+            "total_sessions": len(week_workouts),
+            "total_duration": fmt_hours(total_seconds),
+            "total_duration_sec": total_seconds,
+            "total_tss": round(total_tss),
+            "by_sport": by_sport,
+        }
+    except Exception:
+        logger.exception("[DASHBOARD] Fehler beim Berechnen der Wochenstatistiken")
+
+    return {
+        "training_status": training_status,
+        "last_workouts": last_workouts,
+        "week_stats": week_stats,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Training Today — strukturierte Empfehlung
+#
+# POST /dashboard/training-today
+#
+# Fragt den FitnessAgent um eine personalisierte Trainingsempfehlung
+# für heute. Die Antwort ist strukturiertes JSON.
+# ---------------------------------------------------------------------------
+
+
+@app.post("/dashboard/training-today")
+def dashboard_training_today():
+    """Strukturierte Trainingsempfehlung für heute."""
+    try:
+        recommendation = fitness_agent.get_training_today_recommendation()
+        return {
+            "success": True,
+            "data": recommendation.model_dump(mode="json"),
+        }
+    except RuntimeError as exc:
+        logger.exception("[TRAINING-TODAY] LLM-Fehler")
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        )
+    except Exception:
+        logger.exception("[TRAINING-TODAY] Unerwarteter Fehler")
+        raise HTTPException(
+            status_code=500,
+            detail="Konnte keine Trainingsempfehlung erzeugen.",
+        )
 
 
 # ---------------------------------------------------------------------------

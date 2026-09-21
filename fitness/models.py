@@ -1,5 +1,133 @@
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from enum import Enum
+import re
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+# ------------------------------------------------------------------ #
+# Training Today — strukturierte Empfehlung                        #
+# ------------------------------------------------------------------ #
+
+
+class SportType(str, Enum):
+    """Mögliche Sportarten für die Empfehlung."""
+    RUN = "Run"
+    RIDE = "Ride"
+    SWIM = "Swim"
+
+
+class WorkoutType(str, Enum):
+    """Maschinell lesbarer Workourttyp."""
+    EASY = "easy"
+    TEMPO = "tempo"
+    THRESHOLD = "threshold"
+    VO2 = "vo2"
+    Z2 = "z2"
+    TECHNIQUE = "technique"
+    # Fallback, wenn kein Typ passt
+    OTHER = "other"
+
+
+class AlternativeCategory(str, Enum):
+    """Kategorie einer Alternative — steuert auch UI-Färbung."""
+    SWIM = "swim"
+    HARD = "hard"
+    EASY = "easy"
+
+
+class Alternative(BaseModel):
+    """Eine Alternative zur Hauptempfehlung."""
+    category: AlternativeCategory
+    sport: SportType
+    title: str = Field(..., min_length=1, max_length=120)
+    duration_min: int = Field(..., ge=1, le=480)
+    details: str = Field(..., min_length=1, max_length=500)
+    available: bool = True
+    unavailable_reason: str | None = None
+
+    @field_validator("unavailable_reason")
+    @classmethod
+    def validate_unavailable_reason(cls, v: str | None, info) -> str | None:
+        if v is not None and not v.strip():
+            raise ValueError("unavailable_reason darf nicht leer sein, wenn available=False")
+        if v is not None and info.data.get("available", True):
+            raise ValueError("unavailable_reason sollte nur bei available=False gesetzt sein")
+        return v
+
+    @model_validator(mode="after")
+    def validate_availability(self):
+        if not self.available and self.unavailable_reason is None:
+            raise ValueError("unavailable_reason ist bei available=False erforderlich")
+        return self
+
+
+class PrimaryRecommendation(BaseModel):
+    """Die Hauptempfehlung für heute."""
+    sport: SportType
+    type: WorkoutType
+    title: str = Field(..., min_length=1, max_length=120)
+    duration_min: int = Field(..., ge=1, le=480)
+    details: str = Field(..., min_length=1, max_length=800)
+
+
+class TrainingTodayRecommendation(BaseModel):
+    """Strukturierte Training-Heute-Empfehlung."""
+    primary: PrimaryRecommendation
+    alternatives: list[Alternative] = Field(..., min_length=3, max_length=6)
+    reason: str = Field(..., min_length=10, max_length=500)
+    warning: str | None = None
+
+    @field_validator("alternatives")
+    @classmethod
+    def validate_alternatives(cls, v: list[Alternative]) -> list[Alternative]:
+        categories = [alt.category for alt in v]
+        # Mindestens eine Schwimmen-Alternative
+        if AlternativeCategory.SWIM not in categories:
+            raise ValueError("Mindestens eine Alternative muss die Kategorie 'swim' haben")
+        # Mindestens eine harte Alternative
+        if AlternativeCategory.HARD not in categories:
+            raise ValueError("Mindestens eine Alternative muss die Kategorie 'hard' haben")
+        # Mindestens eine lockere Alternative
+        if AlternativeCategory.EASY not in categories:
+            raise ValueError("Mindestens eine Alternative muss die Kategorie 'easy' haben")
+        return v
+
+    @model_validator(mode="after")
+    def validate_evidence_based_language(self):
+        texts = [
+            self.primary.title,
+            self.primary.details,
+            self.reason,
+            self.warning or "",
+        ]
+        for alternative in self.alternatives:
+            texts.extend([
+                alternative.title,
+                alternative.details,
+                alternative.unavailable_reason or "",
+            ])
+
+        combined = " ".join(texts).casefold()
+        unsupported_claims = (
+            "verletzungsrisiko",
+            "nervensystem",
+            "erholung verzögern",
+            "erholung verzögert",
+        )
+        if any(claim in combined for claim in unsupported_claims):
+            raise ValueError("medizinische oder kausale Risikoaussage ist nicht ausreichend belegt")
+
+        isolated_atl_patterns = (
+            r"\batl(?:-wert)?\s+(?:von\s+|mit\s+)?\d+(?:[.,]\d+)?\s+ist\s+(?:zu\s+|sehr\s+)?hoch\b",
+            r"\batl\s+ist\s+(?:mit\s+|bei\s+)?\d+(?:[.,]\d+)?\s+(?:zu\s+|sehr\s+)?hoch\b",
+            r"\batl\s+ist\s+(?:zu\s+|sehr\s+)?hoch\b",
+            r"\b(?:zu\s+|sehr\s+)?hohe[rn]?\s+atl\b",
+        )
+        if any(re.search(pattern, combined) for pattern in isolated_atl_patterns):
+            raise ValueError("ATL darf nicht isoliert als hoch oder zu hoch bewertet werden")
+
+        return self
 
 
 class WorkoutSplit(BaseModel):
