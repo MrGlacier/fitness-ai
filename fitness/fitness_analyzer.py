@@ -7,6 +7,15 @@ from fitness.models import TrainingStatus, Workout, WorkoutSplit
 SIMILAR_WORKOUT_DAYS = 90
 PREVIOUS_WORKOUT_DAYS = 365
 
+STREAM_STATS_ALLOWED_TYPES = (
+    "heartrate",
+    "watts",
+    "cadence",
+    "velocity_smooth",
+    "temp",
+    "respiration",
+)
+
 
 class FitnessAnalyzer:
     def __init__(self, intervals_client):
@@ -335,10 +344,15 @@ class FitnessAnalyzer:
         compact_stats: dict[str, Any] = {}
 
         for metric, data in stream_stats.items():
+            if metric not in STREAM_STATS_ALLOWED_TYPES:
+                continue
             compact_stats[metric] = {
                 "min": data.get("min"),
                 "max": data.get("max"),
                 "avg": data.get("avg"),
+                "start": data.get("start_avg"),
+                "mid": data.get("mid_avg"),
+                "end": data.get("end_avg"),
                 "trend": self._compute_trend(
                     data.get("start_avg"),
                     data.get("mid_avg"),
