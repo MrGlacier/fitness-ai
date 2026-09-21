@@ -185,7 +185,7 @@ function start_tmux() {
             -hf '$MODEL' \
             --host 127.0.0.1 \
             --port 8080 \
-            -c 65536 \
+            -c 131072 \
             -fa on \
             -ctk q8_0 \
             -ctv q8_0 \

@@ -3,6 +3,7 @@
 
 from datetime import date, datetime, timedelta
 from math import ceil
+from typing import Any
 
 import httpx
 
@@ -158,6 +159,143 @@ class IntervalsClient:
         return results
 
 
+    def get_activity_streams(self, activity_id: str) -> dict[str, list]:
+        """Lädt Roh-Streams für eine Aktivität und gibt sie als transponiertes Dict zurück."""
+        streams_endpoint = intervals_icu_endpoints["activity-streams"].format(
+            activity_id=activity_id,
+        )
+
+        try:
+            streams = self._get(
+                streams_endpoint,
+                {"includeDefaults": "true"},
+            )
+        except httpx.HTTPError:
+            logger.warning("No activity streams available for %s", activity_id)
+            return {}
+
+        if not isinstance(streams, list):
+            logger.warning(
+                "Unexpected activity streams response for %s: %s",
+                activity_id,
+                type(streams).__name__,
+            )
+            return {}
+
+        return self._transpose_streams(streams)
+
+    def _compute_stream_stats(self, streams: dict[str, list]) -> dict[str, Any]:
+        """Berechnet Min/Max/Durchschnitt und Start/Mitte/Ende für jeden Stream."""
+        if not streams:
+            return {}
+
+        stats: dict[str, Any] = {}
+        for name, values in streams.items():
+            if not isinstance(values, list) or not values:
+                continue
+
+            numeric = [
+                v for v in values
+                if isinstance(v, (int, float)) and not isinstance(v, bool)
+            ]
+            if not numeric:
+                continue
+
+            stats[name] = {
+                "min": round(min(numeric), 1),
+                "max": round(max(numeric), 1),
+                "avg": round(sum(numeric) / len(numeric), 1),
+            }
+
+            # Start / Mitte / Ende — jeweils ein Drittel der Werte
+            third = max(1, len(numeric) // 3)
+            start_vals = numeric[:third]
+            mid_vals = numeric[third : third * 2]
+            end_vals = numeric[third * 2 :]
+
+            stats[name]["start_avg"] = round(sum(start_vals) / len(start_vals), 1)
+            stats[name]["mid_avg"] = round(sum(mid_vals) / len(mid_vals), 1)
+            stats[name]["end_avg"] = round(sum(end_vals) / len(end_vals), 1)
+
+        return stats
+
+    def get_activity_detail(self, activity_id: str) -> dict[str, Any]:
+        """Lädt Aktivitäts-Details inkl. Streams und kompakter Statistiken."""
+        endpoint = intervals_icu_endpoints["activity-details"].format(
+            activity_id=activity_id,
+        )
+
+        try:
+            activity = self._get(endpoint, {"intervals": "true"})
+        except httpx.HTTPError:
+            logger.warning("No activity details available for %s", activity_id)
+            return {}
+
+        if not isinstance(activity, dict):
+            logger.warning(
+                "Unexpected activity details response for %s: %s",
+                activity_id,
+                type(activity).__name__,
+            )
+            return {}
+
+        # Streams laden
+        streams = self.get_activity_streams(activity_id)
+
+        # Splits berechnen (verwendet bereits geladene activity/streams,
+        # damit keine doppelten API-Requests entstehen)
+        splits = self._build_splits_from_activity_and_streams(
+            activity=activity,
+            streams=streams,
+        )
+
+        # Basis-Aktivitätsdaten aufbereiten
+        start_date = activity.get("start_date")
+        distance = activity.get("distance")
+
+        return {
+            "id": activity.get("id"),
+            "name": activity.get("name"),
+            "start_date": start_date,
+            "sport": activity.get("type"),
+            "distance_km": round(meters_to_km(distance), 2) if distance else None,
+            "duration_sec": activity.get("moving_time"),
+            "avg_hr": activity.get("average_heartrate"),
+            "max_hr": activity.get("max_heartrate"),
+            "avg_watts": activity.get("icu_weighted_avg_watts"),
+            "avg_cadence": activity.get("average_cadence"),
+            "elevation_gain": activity.get("total_elevation_gain"),
+            "tss": activity.get("icu_training_load"),
+            "intensity": round(activity.get("icu_intensity"), 2)
+            if activity.get("icu_intensity") is not None
+            else None,
+            "rpe": activity.get("icu_rpe"),
+            "stream_stats": self._compute_stream_stats(streams) if streams else {},
+            "splits": splits,
+        }
+
+    def _build_splits_from_activity_and_streams(
+        self,
+        activity: dict,
+        streams: dict[str, list],
+    ) -> list[WorkoutSplit]:
+        """Berechnet Splits aus bereits geladenen activity- und stream-Daten."""
+        intervals = activity.get("icu_intervals")
+        if isinstance(intervals, list) and intervals:
+            return self._map_intervals_to_workout_splits(intervals)
+
+        if not streams:
+            return []
+
+        raw_streams = [
+            {"type": key, "data": value}
+            for key, value in streams.items()
+        ]
+        return self._map_streams_to_workout_splits(
+            streams=raw_streams,
+            sport_type=activity.get("type"),
+        )
+
     def get_athlete(self) -> Athlete:
         endpoint = intervals_icu_endpoints["athlete"].format(athlete_id=self.athlete_id)
         athlete = self._get(endpoint)
@@ -289,16 +427,25 @@ class IntervalsClient:
 
         return splits
 
+    def _transpose_streams(self, raw_streams: list[dict]) -> dict[str, list]:
+        """Pivot API-Stream-Einträge in ein Dict ohne die Daten zu ändern."""
+        transposed: dict[str, list] = {}
+        for stream in raw_streams:
+            if not isinstance(stream, dict):
+                continue
+            stream_type = stream.get("type")
+            data = stream.get("data")
+            if not stream_type or not isinstance(data, list) or not data:
+                continue
+            transposed[stream_type] = data
+        return transposed
+
     def _map_streams_to_workout_splits(
         self,
         streams: list[dict],
         sport_type: str | None,
     ) -> list[WorkoutSplit]:
-        stream_data = {
-            stream.get("type"): stream.get("data")
-            for stream in streams
-            if isinstance(stream, dict) and isinstance(stream.get("data"), list)
-        }
+        stream_data = self._transpose_streams(streams)
         times = stream_data.get("time")
         distances = stream_data.get("distance")
 

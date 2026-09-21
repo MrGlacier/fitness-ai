@@ -69,5 +69,10 @@ def test_intervals_connection() -> dict:
     """Prüft die Verbindung zur Intervals.icu API und gibt den konfigurierten Athleten zurück."""
     return intervals_client_instance.test_connection()
 
+@mcp.tool()
+def get_activity_detail(activity_id: str) -> dict:
+    """Liefert eine einzelne Aktivität mit Stream-Statistiken (HR, Leistung, Pace etc.) und Splits. activity_id ist die ID der Aktivität in Intervals.icu."""
+    return fitness_analyzer_instance.get_activity_detail(activity_id)
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")

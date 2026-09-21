@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from statistics import mean, median, pstdev
+from typing import Any
 
 from fitness.models import TrainingStatus, Workout, WorkoutSplit
 
@@ -305,6 +306,83 @@ class FitnessAnalyzer:
                 )
 
         return last_workout
+
+    def get_activity_detail(self, activity_id: str) -> dict[str, Any]:
+        """Lädt eine einzelne Aktivität mit Stream-Statistiken und Splits."""
+        raw = self.intervals_client_instance.get_activity_detail(activity_id)
+
+        if not raw:
+            return {"error": "activity_not_found", "activity_id": activity_id}
+
+        workout = Workout(
+            id=raw.get("id") or activity_id,
+            name=raw.get("name") or "",
+            start_time=(
+                raw.get("start_date")
+                and (
+                    raw["start_date"]
+                    if isinstance(raw["start_date"], str)
+                    else raw["start_date"].isoformat()
+                )
+            ),
+            sport=raw.get("sport") or "",
+            distance_km=raw.get("distance_km") or 0.0,
+            duration_sec=raw.get("duration_sec") or 0,
+        )
+
+        # Stream-Statistiken kompakt aufbereiten
+        stream_stats = raw.get("stream_stats") or {}
+        compact_stats: dict[str, Any] = {}
+
+        for metric, data in stream_stats.items():
+            compact_stats[metric] = {
+                "min": data.get("min"),
+                "max": data.get("max"),
+                "avg": data.get("avg"),
+                "trend": self._compute_trend(
+                    data.get("start_avg"),
+                    data.get("mid_avg"),
+                    data.get("end_avg"),
+                ),
+            }
+
+        return {
+            "id": workout.id,
+            "name": workout.name,
+            "start_date": workout.start_time,
+            "sport": workout.sport,
+            "distance_km": workout.distance_km,
+            "duration_sec": workout.duration_sec,
+            "avg_hr": raw.get("avg_hr"),
+            "max_hr": raw.get("max_hr"),
+            "avg_watts": raw.get("avg_watts"),
+            "tss": raw.get("tss"),
+            "intensity": raw.get("intensity"),
+            "rpe": raw.get("rpe"),
+            "stream_stats": compact_stats,
+            "splits": raw.get("splits", []),
+        }
+
+    @staticmethod
+    def _compute_trend(start: float | None, mid: float | None, end: float | None) -> str | None:
+        """Ermittelt eine kompakte Trend-Beschreibung aus Start/Mitte/Ende-Werten."""
+        values = [v for v in (start, mid, end) if v is not None]
+        if len(values) < 2:
+            return None
+
+        first = values[0]
+        last = values[-1]
+        if first == 0:
+            return None
+
+        change_pct = ((last - first) / first) * 100
+
+        if abs(change_pct) < 5:
+            return "stabil"
+        elif change_pct < 0:
+            return f"abnehmend ({round(change_pct)} %)"
+        else:
+            return f"zunehmend ({round(change_pct)} %)"
 
     def _build_subjective_summary(self, workout: Workout) -> str | None:
         if workout.rpe is None:
