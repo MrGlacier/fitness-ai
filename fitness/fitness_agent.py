@@ -462,6 +462,9 @@ Antwort:
 
         data: dict[str, Any] = {}
 
+        # Heutiges Datum für das Modell als Referenz bereitstellen
+        data["heute"] = for_date.strftime("%Y-%m-%d")
+
         # TrainingStatus
         try:
             status = self._analyzer.get_current_training_status(for_date)
@@ -502,6 +505,9 @@ Antwort:
                 {
                     "date": w.start_time.strftime("%Y-%m-%d") if w.start_time else "?",
                     "sport": w.sport,
+                    "days_ago": (for_date - w.start_time.date()).days
+                    if w.start_time
+                    else None,
                     "duration_min": round(w.duration_sec / 60) if w.duration_sec else None,
                     "tss": w.tss,
                     "intensity": w.intensity,
@@ -521,6 +527,9 @@ Antwort:
             data[f"last_{sport}"] = {
                 "date": last.start_time.strftime("%Y-%m-%d") if last else None,
                 "sport": last.sport if last else None,
+                "days_ago": (for_date - last.start_time.date()).days
+                if last and last.start_time
+                else None,
                 "duration_min": round(last.duration_sec / 60) if last and last.duration_sec else None,
                 "tss": last.tss if last else None,
                 "intensity": last.intensity if last else None,

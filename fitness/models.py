@@ -88,6 +88,11 @@ class TrainingTodayRecommendation(BaseModel):
         # Mindestens eine harte Alternative
         if AlternativeCategory.HARD not in categories:
             raise ValueError("Mindestens eine Alternative muss die Kategorie 'hard' haben")
+        if any(
+            alt.category == AlternativeCategory.HARD and not alt.available
+            for alt in v
+        ):
+            raise ValueError("Die harte Alternative muss immer verfügbar sein")
         # Mindestens eine lockere Alternative
         if AlternativeCategory.EASY not in categories:
             raise ValueError("Mindestens eine Alternative muss die Kategorie 'easy' haben")
