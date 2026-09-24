@@ -206,8 +206,9 @@ def dashboard_summary():
         def fmt_hours(sec: int) -> str:
             if sec is None:
                 return "?"
-            h, m = divmod(sec, 3600)
-            return f"{h}h {m:02d}m" if h else f"{m}m"
+            hours = sec // 3600
+            minutes = (sec % 3600) // 60
+            return f"{hours}h {minutes}m" if hours else f"{minutes}m"
 
         week_stats = {
             "total_sessions": len(week_workouts),

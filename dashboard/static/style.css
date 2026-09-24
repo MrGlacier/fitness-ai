@@ -26,6 +26,10 @@
     --input-bg:      #1a1a2e;
     --input-border:  #3a3a4e;
     --table-stripe:  rgba(255, 255, 255, 0.015);
+    /* TSS-Färbung */
+    --tss-blue:      #3b82f6;
+    --tss-orange:    #f59e0b;
+    --tss-red:       #ef4444;
 }
 
 /* ====== LIGHT MODE Override ====== */
@@ -46,6 +50,10 @@
         --input-bg:      #ffffff;
         --input-border:  #d1d5db;
         --table-stripe:  rgba(0, 0, 0, 0.02);
+        /* TSS-Färbung */
+        --tss-blue:      #2563eb;
+        --tss-orange:    #d97706;
+        --tss-red:       #dc2626;
     }
 }
 
@@ -350,6 +358,25 @@ main {
 }
 
 /* ============================================================
+   TSS-Färbung (niedrig = blau, mittel = orange, hoch = rot)
+   ============================================================ */
+.tss {
+    font-weight: 600;
+}
+
+.tss.tss-low {
+    color: var(--tss-blue);
+}
+
+.tss.tss-medium {
+    color: var(--tss-orange);
+}
+
+.tss.tss-high {
+    color: var(--tss-red);
+}
+
+/* ============================================================
    Chat
    ============================================================ */
 .chat-form {
@@ -421,6 +448,39 @@ main {
     font-style: italic;
     font-size: 0.88rem;
     padding: 0.5rem 0;
+}
+
+.placeholder a {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+/* ============================================================
+   Loading-State (Spinner)
+   ============================================================ */
+.training-today-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem 0;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.spinner {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--card-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ============================================================
@@ -658,6 +718,16 @@ footer {
     color: var(--text-muted);
     letter-spacing: 0.08em;
     text-transform: uppercase;
+}
+
+.alt-sport {
+    font-size: 0.85rem;
+    color: var(--text);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: -0.2rem;
 }
 
 .alt-title {

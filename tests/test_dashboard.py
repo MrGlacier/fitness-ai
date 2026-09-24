@@ -2,6 +2,8 @@
 
 import json
 import unittest
+from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -104,7 +106,15 @@ class DashboardRouteTests(unittest.TestCase):
                     "duration_min": 40,
                     "details": "Ruhig laufen.",
                 },
-                "alternatives": [],
+                "alternatives": [
+                    {
+                        "category": "hard",
+                        "sport": "Ride",
+                        "title": "Schwellenintervalle",
+                        "duration_min": 50,
+                        "details": "3 × 8 Minuten an der Schwelle.",
+                    },
+                ],
                 "reason": "Passt zum Gesamtbild.",
                 "warning": None,
             },
@@ -115,6 +125,8 @@ class DashboardRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Lockerer Lauf", response.body.decode())
+        self.assertIn("BALLERN", response.body.decode())
+        self.assertIn("🚴 Ride", response.body.decode())
         mock_client.post.assert_called_once()
 
     def test_dashboard_healthcheck_has_no_external_dependency(self):
@@ -141,6 +153,7 @@ class DashboardRouteTests(unittest.TestCase):
 
         html = response.body.decode()
         self.assertIn("Training heute", html)
+        self.assertIn("training-today-loading", html)
         self.assertIn("Fitnesswerte", html)
         self.assertIn("7 Tage", html)
         self.assertIn("Letzte Aktivit", html)
@@ -168,6 +181,8 @@ class DashboardRouteTests(unittest.TestCase):
         self.assertIn("Ride", html)
         self.assertIn("10.0 km", html)
         self.assertIn("45.0 km", html)
+        self.assertEqual(html.count('class="tss tss-high"'), 2)
+        self.assertIn('<span class="week-stat tss">TSS: 185</span>', html)
 
     @patch("dashboard.routes._api_client")
     def test_dashboard_handles_api_unavailable(self, mock_client):
@@ -277,6 +292,29 @@ class DashboardSummaryEndpointTests(unittest.TestCase):
         import api
         self.assertTrue(callable(api.dashboard_summary))
 
+    def test_summary_formats_hours_and_remaining_minutes(self):
+        """Restsekunden werden nicht irrtümlich als Minuten angezeigt."""
+        import api
+
+        workout = SimpleNamespace(
+            start_time=datetime.now(),
+            name="Testfahrt",
+            sport="Ride",
+            distance_km=40.0,
+            duration_sec=7320,
+            tss=75,
+        )
+
+        with patch.object(api._analyzer, "get_current_training_status", return_value=None), \
+             patch.object(
+                 api._analyzer.intervals_client_instance,
+                 "get_recent_workouts",
+                 return_value=[workout],
+             ):
+            summary = api.dashboard_summary()
+
+        self.assertEqual(summary["week_stats"]["total_duration"], "2h 2m")
+
 
 class TrainingTodayModelTests(unittest.TestCase):
     """Tests fur das TrainingTodayRecommendation Pydantic-Modell."""
@@ -325,8 +363,8 @@ class TrainingTodayModelTests(unittest.TestCase):
         self.assertEqual(rec.primary.type, "threshold")
         self.assertEqual(len(rec.alternatives), 3)
 
-    def test_alternative_unavailable(self):
-        """Eine Alternative kann als nicht verfugbar markiert werden."""
+    def test_non_hard_alternative_can_be_unavailable(self):
+        """Eine nicht harte Alternative kann als nicht verfügbar markiert werden."""
         from fitness.models import TrainingTodayRecommendation
 
         data = {
@@ -338,8 +376,8 @@ class TrainingTodayModelTests(unittest.TestCase):
                 "details": "Locker laufen",
             },
             "alternatives": [
-                {"category": "swim", "sport": "Swim", "title": "Easy Swim", "duration_min": 30, "details": "Locker schwimmen", "available": True},
-                {"category": "hard", "sport": "Ride", "title": "VO2", "duration_min": 50, "details": "Hart", "available": False, "unavailable_reason": "Die Belastung der letzten Tage und der nahe Wettkampf sprechen heute gegen eine weitere harte Einheit."},
+                {"category": "swim", "sport": "Swim", "title": "Easy Swim", "duration_min": 30, "details": "Locker schwimmen", "available": False, "unavailable_reason": "Kein Schwimmtraining möglich."},
+                {"category": "hard", "sport": "Ride", "title": "VO2", "duration_min": 50, "details": "Hart"},
                 {"category": "easy", "sport": "Run", "title": "Easy Run", "duration_min": 45, "details": "Locker laufen"},
             ],
             "reason": "Test-Begrundung.",
@@ -347,8 +385,8 @@ class TrainingTodayModelTests(unittest.TestCase):
         }
 
         rec = TrainingTodayRecommendation(**data)
-        hard_alt = next(a for a in rec.alternatives if a.category == "hard")
-        self.assertFalse(hard_alt.available)
+        swim_alt = next(a for a in rec.alternatives if a.category == "swim")
+        self.assertFalse(swim_alt.available)
 
     def test_missing_swim_raises(self):
         """Ohne Schwimmen-Alternative wird ein Fehler geworfen."""
@@ -386,6 +424,47 @@ class TrainingTodayModelTests(unittest.TestCase):
         json_str = rec.model_dump_json()
         rec2 = TrainingTodayRecommendation.model_validate_json(json_str)
         self.assertEqual(rec2.primary.title, "3 × 8")
+
+
+class TssColorClassTests(unittest.TestCase):
+    """Tests für den TSS-Färbungs-Filter."""
+
+    def test_tss_low_returns_blue_class(self):
+        """TSS ≤ 40 → tss-low."""
+        from dashboard.routes import _tss_color_class
+
+        self.assertEqual(_tss_color_class(0), "tss-low")
+        self.assertEqual(_tss_color_class(20), "tss-low")
+        self.assertEqual(_tss_color_class(40), "tss-low")
+
+    def test_tss_medium_returns_orange_class(self):
+        """41 ≤ TSS ≤ 70 → tss-medium."""
+        from dashboard.routes import _tss_color_class
+
+        self.assertEqual(_tss_color_class(41), "tss-medium")
+        self.assertEqual(_tss_color_class(55), "tss-medium")
+        self.assertEqual(_tss_color_class(70), "tss-medium")
+
+    def test_tss_high_returns_red_class(self):
+        """TSS > 70 → tss-high."""
+        from dashboard.routes import _tss_color_class
+
+        self.assertEqual(_tss_color_class(71), "tss-high")
+        self.assertEqual(_tss_color_class(100), "tss-high")
+        self.assertEqual(_tss_color_class(200), "tss-high")
+
+    def test_tss_none_returns_empty_string(self):
+        """None → leere Zeichenkette."""
+        from dashboard.routes import _tss_color_class
+
+        self.assertEqual(_tss_color_class(None), "")
+
+    def test_tss_thresholds_are_exported(self):
+        """Schwellenwerte sind als Modulebenen-Konstanten verfügbar."""
+        from dashboard.routes import TSS_LOW_MAX, TSS_MEDIUM_MAX
+
+        self.assertEqual(TSS_LOW_MAX, 40)
+        self.assertEqual(TSS_MEDIUM_MAX, 70)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,28 @@ from dashboard.app import app, FITNESS_API_URL, templates
 
 from core.logger import logger
 
+# ------------------------------------------------------------------ #
+# TSS-Färbung: zentrale, leicht anpassbare Schwellenwerte
+# ------------------------------------------------------------------ #
+
+#: Niedriger TSS — blaue Markierung
+TSS_LOW_MAX = 40
+#: Mittlerer TSS — orangefarbene Markierung
+TSS_MEDIUM_MAX = 70
+#: Hoher TSS — rote Markierung (alles darüber)
+
+
+def _tss_color_class(tss: int | float | None) -> str:
+    """Gibt CSS-Klasse für TSS-Färbung zurück."""
+    if tss is None:
+        return ""
+    if tss <= TSS_LOW_MAX:
+        return "tss-low"
+    if tss <= TSS_MEDIUM_MAX:
+        return "tss-medium"
+    return "tss-high"
+
+
 # Globaler httpx-Client — wird wiederverwendet
 _api_client = httpx.Client(
     base_url=FITNESS_API_URL,
@@ -200,3 +222,4 @@ def _render_template(
 # Custom Jinja2-Filter für die reine Anzeige
 templates.env.filters["format_duration"] = _format_duration
 templates.env.filters["format_duration_short"] = _format_duration_short
+templates.env.filters["tss_color_class"] = _tss_color_class

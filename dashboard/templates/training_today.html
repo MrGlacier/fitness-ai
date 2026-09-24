@@ -3,11 +3,7 @@
     <div class="primary-recommendation">
         <div class="primary-header">
             <span class="primary-sport">
-                {% if p.sport == 'Run' %}🏃
-                {% elif p.sport == 'Ride' %}🚴
-                {% elif p.sport == 'Swim' %}🏊
-                {% else %}🏃{% endif %}
-                {{ p.sport|capitalize }} · {{ p.type|capitalize }}
+                {{ p.sport|sport_emoji }} {{ p.sport|capitalize }} · {{ p.type|capitalize }}
             </span>
             <span class="primary-duration">⏱️ {{ p.duration_min }} min</span>
         </div>
@@ -33,6 +29,9 @@
                 <span class="alt-emoji">🏊</span><span class="alt-label">SCHWIMMEN</span>
             {% elif alt.category == 'hard' %}
                 <span class="alt-emoji">🔥</span><span class="alt-label">BALLERN</span>
+                <span class="alt-sport">
+                    {{ alt.sport|sport_emoji }} {{ alt.sport|capitalize }}
+                </span>
             {% elif alt.category == 'easy' %}
                 <span class="alt-emoji">🌿</span><span class="alt-label">LOCKER</span>
             {% endif %}

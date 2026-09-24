@@ -32,7 +32,10 @@
         <section class="card card-highlight training-today-card">
             <h2>🎯 Training heute</h2>
             <div class="training-today-content" id="training-today-content">
-                <p class="placeholder">Trainingsempfehlung wird vorbereitet…</p>
+                <div class="training-today-loading" id="training-today-loading">
+                    <div class="spinner"></div>
+                    <span>Trainingsempfehlung wird geladen…</span>
+                </div>
             </div>
         </section>
 
@@ -124,7 +127,7 @@
                                 <td>{{ w.get('sport', '?') }}</td>
                                 <td>{{ w.get('distance_km')|default('?') }} km</td>
                                 <td>{{ w.get('duration_sec')|default(0)|format_duration }}</td>
-                                <td>{{ w.get('tss')|default('?') }}</td>
+                                <td class="tss {{ w.get('tss')|tss_color_class }}">{{ w.get('tss')|default('?') }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
