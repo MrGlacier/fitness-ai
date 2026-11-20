@@ -151,6 +151,9 @@ class WorkoutSplit(BaseModel):
 
 
 class Workout(BaseModel):
+    local_date: date | None = None
+    paired_event_id: str | None = None
+    is_race: bool = False
     id: str
     name: str
     start_time: datetime

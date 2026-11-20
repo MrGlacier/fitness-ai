@@ -2,7 +2,10 @@
 # https://intervals.icu/api-docs.html
 
 from datetime import date, datetime, timedelta
-from math import ceil
+from math import ceil, isfinite
+from copy import deepcopy
+from threading import RLock
+from time import monotonic
 from typing import Any
 
 import httpx
@@ -36,11 +39,23 @@ WORKOUT_STREAM_TYPES = (
 MAX_ACTIVITY_SEARCH_RESULTS = 50
 
 
+def _nonnegative_number(value) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if isfinite(number) and number >= 0 else None
+
+
 class IntervalsClient:
     def __init__(self, base_url: str | None = None):
         self.basic_auth = httpx.BasicAuth(username=config.get_intervals_icu_username(), password=config.get_intervals_icu_api_key())
         self.base_url = base_url or config.get_intervals_icu_api_url()
         self.client = httpx.Client(base_url=self.base_url, auth=self.basic_auth)
+        self._cache = {}
+        self._cache_lock = RLock()
         self.athlete_id = config.get_intervals_icu_athlete_id()
 
     def get_workouts(
@@ -404,6 +419,9 @@ class IntervalsClient:
         variability_index = activity.get("icu_variability_index")
 
         workout =  Workout(
+            local_date=date.fromisoformat(str(activity["start_date_local"])[:10]) if activity.get("start_date_local") else None,
+            paired_event_id=str(activity["paired_event_id"]) if activity.get("paired_event_id") is not None else None,
+            is_race=bool(activity.get("race", False)),
             id = activity["id"],
             name = activity["name"],
             start_time = datetime.fromisoformat(start_date),
@@ -648,6 +666,55 @@ class IntervalsClient:
             elevation_gain=elevation_gain,
         )
 
+    def get_calendar(self, from_date: date, to_date: date) -> list[dict]:
+        """Read all calendar events, retaining only analysis fields (no writes)."""
+        raw = self._get(f"/athlete/{self.athlete_id}/events",
+                        {"oldest": from_date.isoformat(), "newest": to_date.isoformat()})
+        if not isinstance(raw, list):
+            raise ValueError("Expected calendar list")
+        events = []
+        for item in raw:
+            if not isinstance(item, dict) or item.get("id") is None:
+                continue
+            try:
+                day = date.fromisoformat(str(item.get("start_date_local", ""))[:10])
+            except ValueError:
+                continue
+            if not from_date <= day <= to_date:
+                continue
+            events.append(dict(id=str(item["id"]), date=day.isoformat(),
+                               name=item.get("name") or "Untitled", sport=item.get("type") or "",
+                               category=item.get("category", ""), description=item.get("description") or "",
+                               duration_sec=_nonnegative_number(item.get("moving_time")), distance_km=_nonnegative_number(item.get("distance")) / 1000 if _nonnegative_number(item.get("distance")) is not None else None,
+                               tss=_nonnegative_number(item.get("icu_training_load")), intensity_percent=_nonnegative_number(item.get("icu_intensity")),
+                               activity_id=str(item["paired_activity_id"]) if item.get("paired_activity_id") else None))
+        return events
+
+    def get_wellness_history(self, from_date: date, to_date: date) -> list[dict]:
+        raw = self._get(f"/athlete/{self.athlete_id}/wellness",
+                        {"oldest": from_date.isoformat(), "newest": to_date.isoformat()})
+        if not isinstance(raw, list):
+            raise ValueError("Expected wellness list")
+        results = []
+        for row in raw:
+            if not isinstance(row, dict):
+                continue
+            try:
+                day = date.fromisoformat(str(row.get("id", "")))
+            except ValueError:
+                continue
+            if not from_date <= day <= to_date:
+                continue
+            ctl = _nonnegative_number(row.get("ctl"))
+            atl = _nonnegative_number(row.get("atl"))
+            results.append(dict(date=day.isoformat(), ctl=ctl, atl=atl,
+                                hrv=_nonnegative_number(row.get("hrv")),
+                                resting_hr=_nonnegative_number(row.get("restingHR")),
+                                sleep_secs=_nonnegative_number(row.get("sleepSecs")),
+                                tsb=ctl-atl if ctl is not None and atl is not None else None))
+        return results
+
+
     def get_upcoming_events(
         self,
         days_ahead: int = 30,
@@ -812,11 +879,20 @@ class IntervalsClient:
         )
     
     def _get(self, url: str, query_string: dict | None = None) -> dict | list:
-        #logger.info(f"url: {url}, {query_string}")
+        key = (url, tuple(sorted((k, str(v)) for k, v in (query_string or {}).items())))
+        with self._cache_lock:
+            cached = self._cache.get(key)
+            if cached and monotonic() - cached[0] < 120:
+                return deepcopy(cached[1])
         try:
             response = self.client.get(url, params=query_string)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            with self._cache_lock:
+                if len(self._cache) >= 128:
+                    self._cache.pop(next(iter(self._cache)))
+                self._cache[key] = (monotonic(), deepcopy(data))
+            return data
         except httpx.HTTPStatusError as error:
             logger.exception(
                 "Intervals API request failed. Status: %s, URL: %s",

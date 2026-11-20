@@ -22,3 +22,10 @@ logs/
 
 #open Web Ui
 .openWebUi_Lokale_Admin_Konto_Daten
+# Private training plans, goals and forecast history
+training_plans/originals/*
+!training_plans/originals/.gitkeep
+training_plans/structured/*
+!training_plans/structured/.gitkeep
+training_plans/*.sqlite3*
+.pytest_cache/

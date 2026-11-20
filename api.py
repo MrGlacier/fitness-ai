@@ -228,36 +228,18 @@ def dashboard_summary():
 
 
 # ---------------------------------------------------------------------------
-# Training Today — strukturierte Empfehlung
+# Training Today — deaktivierter Legacy-Endpunkt
 #
 # POST /dashboard/training-today
 #
-# Fragt den FitnessAgent um eine personalisierte Trainingsempfehlung
-# für heute. Die Antwort ist strukturiertes JSON.
+# Antworten mit HTTP 410 verweisen auf die deterministische Trainingsanalyse.
 # ---------------------------------------------------------------------------
 
 
 @app.post("/dashboard/training-today")
 def dashboard_training_today():
-    """Strukturierte Trainingsempfehlung für heute."""
-    try:
-        recommendation = fitness_agent.get_training_today_recommendation()
-        return {
-            "success": True,
-            "data": recommendation.model_dump(mode="json"),
-        }
-    except RuntimeError as exc:
-        logger.exception("[TRAINING-TODAY] LLM-Fehler")
-        raise HTTPException(
-            status_code=500,
-            detail=str(exc),
-        )
-    except Exception:
-        logger.exception("[TRAINING-TODAY] Unerwarteter Fehler")
-        raise HTTPException(
-            status_code=500,
-            detail="Konnte keine Trainingsempfehlung erzeugen.",
-        )
+    """Alte Clients erhalten eine explizite Deaktivierung statt Coaching."""
+    raise HTTPException(status_code=410, detail="Coaching deaktiviert. Verwende /analyst/summary für die Trainingsanalyse.")
 
 
 # ---------------------------------------------------------------------------
@@ -524,3 +506,45 @@ async def chat_completions(request: ChatCompletionRequest):
             "total_tokens": 0,
         },
     }
+
+
+# Analyst calculations and local edits never invoke the LLM.
+from fitness.analyst import TrainingAnalyst
+from fitness.analyst_models import PlanAssignment, Race, TrainingPlan
+
+training_analyst = TrainingAnalyst(intervals_client_instance)
+
+
+@app.get("/analyst/summary")
+def analyst_summary():
+    return training_analyst.summary()
+
+
+@app.get("/analyst/plans")
+def analyst_plans():
+    return [p.model_dump(mode="json") for p in training_analyst.store.plans()]
+
+
+@app.put("/analyst/plans")
+def analyst_save_plan(plan: TrainingPlan):
+    training_analyst.store.save_plan(plan)
+    return plan
+
+
+@app.put("/analyst/assignment")
+def analyst_assign_plan(assignment: PlanAssignment):
+    try:
+        training_analyst.store.save_assignment(assignment)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return assignment
+
+
+@app.put("/analyst/races")
+def analyst_save_race(race: Race):
+    # Reuse linked identity even when a client omits the local ID.
+    for existing in training_analyst.store.records("race"):
+        if race.source_id and existing.get("source_id") == race.source_id:
+            race = race.model_copy(update={"id": existing["id"]})
+            break
+    return training_analyst.store.save_race(race)

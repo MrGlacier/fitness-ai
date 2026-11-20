@@ -88,5 +88,55 @@ def search_activities_by_name(
     """Sucht Aktivitäten nach einem Suchbegriff im Namen (case-insensitive Teilsuche). Optional nach Sportart filtern. Liefert maximal 50 Treffer."""
     return fitness_analyzer_instance.search_activities_by_name(search_term, sport_type, limit)
 
+from fitness.analyst import TrainingAnalyst
+
+
+@mcp.tool()
+def get_training_analysis(section: str = "overview") -> dict:
+    """Analyst data: overview, week, plan, fitness, comparison or races. Deterministic fitness scenarios and preparation index (not goal probability); no race-time predictions or training generation."""
+    data = TrainingAnalyst(intervals_client_instance).summary()
+    keys = {
+        "overview": ["date", "errors", "next_race", "days_to_race", "plan", "fitness_trend"],
+        "week": ["date", "errors", "week", "weekly_comparison"],
+        "plan": ["plan", "available_plans"],
+        "fitness": ["fitness_history", "fitness_forecast", "fitness_trend", "errors"],
+        "comparison": ["comparison", "weekly_comparison", "errors"],
+        "races": ["races", "race_preparation", "errors"],
+    }
+    if section not in keys:
+        return {"error": "Unknown section", "sections": list(keys)}
+    result = {k: data[k] for k in keys[section]}
+    if section == "fitness":
+        # Dashboard keeps daily points; model receives weekly samples plus endpoints.
+        def weekly(points):
+            return [p for i, p in enumerate(points) if i % 7 == 0 or i == len(points) - 1]
+        result["fitness_history"] = weekly(data["fitness_history"])
+        result["fitness_forecast"] = dict(data["fitness_forecast"],
+            points=weekly(data["fitness_forecast"].get("points", [])), sampling="weekly, including last point")
+    if section == "comparison":
+        rows = data["comparison"]["sessions"]
+        result["comparison"] = dict(data["comparison"], sessions=rows[-40:], omitted_sessions=max(0, len(rows) - 40))
+    if section == "races":
+        result["race_preparation"] = {key: dict(value, history=value["history"][-12:])
+                                      for key, value in data["race_preparation"].items()}
+    return result
+
+
+@mcp.tool()
+def search_training_plan(query: str, plan_id: str | None = None, week: int | None = None) -> list[dict]:
+    """Search archived plan sessions, optionally by plan ID and week; at most 30 results."""
+    from fitness.archive import AnalystStore
+    results = []
+    for plan in AnalystStore().plans():
+        if plan_id and plan.id != plan_id:
+            continue
+        for session in plan.sessions:
+            if week is not None and session.week != week:
+                continue
+            row = session.model_dump(mode="json")
+            if query.casefold() in str(row).casefold():
+                results.append(dict(plan_id=plan.id, **row))
+    return results[:30]
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
