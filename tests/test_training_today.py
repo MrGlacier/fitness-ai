@@ -151,42 +151,12 @@ class FakeAnalyzer:
 
 
 class TrainingTodayAgentTests(unittest.TestCase):
-    def test_retry_receives_validation_feedback_and_event_context(self):
-        llm = FakeLlmClient(["not-json", f"```json\n{recommendation_json()}\n```"])
-        analyzer = FakeAnalyzer()
-        agent = FitnessAgent(llm, SimpleNamespace(), analyzer=analyzer)
-
-        recommendation = agent.get_training_today_recommendation(
-            for_date=date(2026, 9, 21)
-        )
-
-        self.assertEqual(recommendation.primary.type.value, "easy")
-        self.assertEqual(len(llm.questions), 2)
-        self.assertIn("Testlauf", llm.questions[0])
-        self.assertIn("vorherige Antwort war ungültig", llm.questions[1])
-        self.assertEqual(len(analyzer.intervals_client_instance.workout_calls), 1)
-        self.assertEqual(
-            analyzer.intervals_client_instance.event_calls,
-            [(21, date(2026, 9, 21))],
-        )
-
-    def test_prompt_includes_heute_date(self):
-        """Das heutige Datum wird an den LLM-Prompt übergeben."""
-        llm = FakeLlmClient([f"```json\n{recommendation_json()}\n```"])
-        analyzer = FakeAnalyzer()
-        agent = FitnessAgent(llm, SimpleNamespace(), analyzer=analyzer)
-
-        agent.get_training_today_recommendation(for_date=date(2026, 9, 21))
-
-        self.assertEqual(len(llm.questions), 1)
-        self.assertIn('"heute"', llm.questions[0])
-        self.assertIn("2026-09-21", llm.questions[0])
-
-    def test_system_prompt_contains_relative_time_rules(self):
-        """Der System-Prompt enthält Regeln für korrekte relative Zeitangaben."""
-        self.assertIn("gestern", TRAINING_TODAY_SYSTEM_PROMPT)
-        self.assertIn("vor 3 Tagen", TRAINING_TODAY_SYSTEM_PROMPT)
-        self.assertIn("Erfinde keine zeitlichen Beziehungen", TRAINING_TODAY_SYSTEM_PROMPT)
+    def test_coaching_disabled_without_llm_call(self):
+        llm = FakeLlmClient([])
+        agent = FitnessAgent(llm, SimpleNamespace())
+        with self.assertRaisesRegex(RuntimeError, "Coaching deaktiviert"):
+            agent.get_training_today_recommendation()
+        self.assertEqual(llm.questions, [])
 
 
 class UpcomingEventsTests(unittest.TestCase):
@@ -304,71 +274,6 @@ class FakeAnalyzerWithWorkouts:
 
     def get_current_ftp(self, sport):
         return {"sport_type": sport, "ftp": None}
-
-
-class DaysAgoPayloadTests(unittest.TestCase):
-    """Stellt sicher, dass days_ago korrekt im LLM-Payload berechnet wird."""
-
-    def test_recent_workouts_include_days_ago(self):
-        """Jedes Workout in recent_workouts enthält days_ago."""
-        from datetime import datetime
-
-        workouts = [
-            FakeWorkout(datetime(2026, 9, 22, 8, 0), "Run", "Tempo-Intervalle"),
-            FakeWorkout(datetime(2026, 9, 20, 10, 0), "Ride", "Lockere Runde"),
-        ]
-        llm = FakeLlmClient([f"```json\n{recommendation_json()}\n```"])
-        analyzer = FakeAnalyzerWithWorkouts(workouts)
-        agent = FitnessAgent(llm, SimpleNamespace(), analyzer=analyzer)
-
-        agent.get_training_today_recommendation(for_date=date(2026, 9, 24))
-
-        self.assertEqual(len(llm.questions), 1)
-        data_text = llm.questions[0]
-        # days_ago muss im Payload vorkommen
-        self.assertIn('"days_ago"', data_text)
-        # Der Tempo-Lauf vom 22.09.2026 bei heute=24.09.2026 → days_ago=2
-        self.assertIn('"days_ago":2', data_text)
-        # Die Runde vom 20.09.2026 → days_ago=4
-        self.assertIn('"days_ago":4', data_text)
-
-    def test_last_run_ride_swim_include_days_ago(self):
-        """last_run, last_ride, last_swim enthalten days_ago."""
-        from datetime import datetime
-
-        workouts = [
-            FakeWorkout(datetime(2026, 9, 22, 8, 0), "Run", "Tempo-Intervalle"),
-            FakeWorkout(datetime(2026, 9, 20, 10, 0), "Ride", "Lockere Runde"),
-        ]
-        llm = FakeLlmClient([f"```json\n{recommendation_json()}\n```"])
-        analyzer = FakeAnalyzerWithWorkouts(workouts)
-        agent = FitnessAgent(llm, SimpleNamespace(), analyzer=analyzer)
-
-        agent.get_training_today_recommendation(for_date=date(2026, 9, 24))
-
-        data_text = llm.questions[0]
-        # last_run sollte days_ago=2 haben
-        self.assertIn('"last_run"', data_text)
-        self.assertIn('"days_ago":2', data_text)
-        # last_ride sollte days_ago=4 haben
-        self.assertIn('"last_ride"', data_text)
-        self.assertIn('"days_ago":4', data_text)
-
-    def test_days_ago_zero_for_same_day(self):
-        """days_ago = 0 wenn Workout am selben Tag stattfindet."""
-        from datetime import datetime
-
-        workouts = [
-            FakeWorkout(datetime(2026, 9, 24, 8, 0), "Run", "Heutiger Lauf"),
-        ]
-        llm = FakeLlmClient([f"```json\n{recommendation_json()}\n```"])
-        analyzer = FakeAnalyzerWithWorkouts(workouts)
-        agent = FitnessAgent(llm, SimpleNamespace(), analyzer=analyzer)
-
-        agent.get_training_today_recommendation(for_date=date(2026, 9, 24))
-
-        data_text = llm.questions[0]
-        self.assertIn('"days_ago":0', data_text)
 
 
 if __name__ == "__main__":

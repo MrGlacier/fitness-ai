@@ -88,11 +88,11 @@ class FitnessAnalyzer:
 
         elif training_status.form >= -10:
             training_status.form_status = "leicht ermüdet"
-            training_status.summary = "Deine kurzfristige Trainingsbelastung liegt leicht über deiner langfristigen Belastung. Eine lockere Einheit könnte sinnvoll sein."
+            training_status.summary = "Deine kurzfristige Trainingsbelastung liegt leicht über deiner langfristigen Belastung."
 
         elif training_status.form >= -20:
             training_status.form_status = "ermüdet"
-            training_status.summary = "Deine kurzfristige Trainingsbelastung liegt deutlich über deiner langfristigen Belastung. Zusätzliche intensive Einheiten solltest du gut abwägen."
+            training_status.summary = "Deine kurzfristige Trainingsbelastung liegt deutlich über deiner langfristigen Belastung."
 
         elif training_status.form >= -30:
             training_status.form_status = "stark ermüdet"
@@ -100,7 +100,7 @@ class FitnessAnalyzer:
 
         else:
             training_status.form_status = "extrem ermüdet"
-            training_status.summary = "Deine kurzfristige Trainingsbelastung liegt aktuell sehr deutlich über deiner langfristigen Belastung. Prüfe vor einer weiteren intensiven Einheit auch die letzten Einheiten und deine Erholungswerte."
+            training_status.summary = "Deine kurzfristige Trainingsbelastung liegt aktuell sehr deutlich über deiner langfristigen Belastung."
 
         return training_status
 
