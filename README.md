@@ -208,14 +208,14 @@ Weitere Beispielfragen:
 ```text
 Bewerte meine letzte Trainingseinheit.
 Welche Herzfrequenzzonen habe ich beim Laufen?
-Welche Einheit sollte ich heute machen?
+Wie gut habe ich meinen Trainingsplan diese Woche umgesetzt?
 Wie viele Kilometer bin ich in den letzten 14 Tagen gelaufen?
 ```
 
 Je nach Frage unterscheidet die Fitness-AI zwischen:
 
 - `data`: sachliche Abfragen, Berechnungen und Vergleiche
-- `coach`: Bewertungen, Einordnungen und Trainingsempfehlungen
+- `coach`: nur noch als kompatibler Antworttyp für Analysen akzeptiert; keine Trainingsgenerierung
 
 ## 🧩 Architektur und Ablauf
 
@@ -274,9 +274,8 @@ Der Chat-Endpunkt unterstützt außerdem OpenAI-kompatible SSE-Antworten mit
 Chunk übertragen; echtes Token-für-Token-Streaming ist noch nicht
 implementiert.
 
-Open WebUI übermittelt zwar den bisherigen Chatverlauf, `api.py` reicht aktuell
-aber nur die letzte Nachricht mit der Rolle `user` an den `FitnessAgent` weiter.
-Mehrturn-Kontext wird daher noch nicht ausgewertet.
+Open WebUI übermittelt den Chatverlauf. Die letzte User-Nachricht wird als
+aktuelle Frage und der übrige Verlauf als Kontext an den FitnessAgent übergeben.
 
 ## 🛠️ Logging und Entwicklung
 
@@ -291,7 +290,7 @@ tail -f core/fitness-ai.log
 Tests ausführen:
 
 ```bash
-uv run python -m unittest discover -s tests -p 'test_*.py'
+uv run python -m pytest -q
 ```
 
 Neue Python-Abhängigkeit hinzufügen:
@@ -300,10 +299,28 @@ Neue Python-Abhängigkeit hinzufügen:
 uv add <paketname>
 ```
 
-## 🎯 Projektziel
+## 🎯 Trainings- und Wettkampfanalyst
 
-Die Fitness-AI soll natürliche Fragen verstehen, passende Datenquellen
-kombinieren und Trainingsdaten nachvollziehbar aufbereiten. Geplante nächste
-Schritte sind echter Gesprächskontext mit Rückfragen sowie Trainingsplanung und
-Plan-vs-Ist-Auswertungen. Der Fokus bleibt auf einer einfachen, lesbaren und
-gut debuggbaren Architektur.
+Fitness AI analysiert externe Trainingspläne und reale Intervals-Daten. Sie
+erstellt keine Ersatzpläne und keine automatischen Trainingsempfehlungen.
+Das Dashboard zeigt Wettkampfziele, aktuelle Planwoche, Soll/Ist, Fitnessverlauf
+mit Kalenderszenario, Planfortschritt und einen nachvollziehbaren Vorbereitungsindex (0–100 %, keine
+Zielerreichungswahrscheinlichkeit).
+
+- [Architektur, Modelle und Grenzen](docs/analyst.md)
+- [Trainingspläne ablegen, importieren und sichern](training_plans/README.md)
+
+Nach dem Update API/MCP neu starten und Dashboard neu bauen:
+
+```bash
+docker compose up -d --build dashboard
+```
+
+Eigene Pläne nach `training_plans/originals/` legen und über
+`uv run python -m fitness.import_plan /pfad/plan.json` importieren.
+Lokale Wettkämpfe/Ziele und manuelle Planzuordnungen im Dashboard pflegen.
+PDF/ältere XLS erfordern eine geprüfte strukturierte Übertragung; einfache
+XLSX-, CSV-, JSON- und Markdown-Tabellen werden deterministisch eingelesen.
+Ohne geeignete Daten zeigt die Anwendung „Datenlage unzureichend“.
+Teilbewertungen, Datenqualität und Indexverlauf bleiben nachvollziehbar;
+das LLM interpretiert ausschließlich die berechneten Werte.
