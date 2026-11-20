@@ -3,12 +3,11 @@
 import httpx
 from typing import Annotated
 
-from fastapi import Form, Request
+from fastapi import Form, Request, HTTPException
 from fastapi.responses import HTMLResponse
 
 from dashboard.app import app, FITNESS_API_URL, templates
 
-from core.logger import logger
 
 # ------------------------------------------------------------------ #
 # TSS-Färbung: zentrale, leicht anpassbare Schwellenwerte
@@ -39,7 +38,6 @@ _api_client = httpx.Client(
 )
 
 _CHAT_TIMEOUT = 120.0  # LLM-Antworten können länger dauern
-_TRAINING_TODAY_TIMEOUT = 180.0  # Training-Today braucht länger (mehr Daten + LLM)
 
 
 # ------------------------------------------------------------------ #
@@ -50,6 +48,7 @@ def _format_duration(seconds: int) -> str:
     """Sekunden als H:MM:SS oder M:SS formatieren."""
     if not seconds or seconds <= 0:
         return "—"
+    seconds = int(seconds)
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     secs = seconds % 60
@@ -108,24 +107,6 @@ def _safe_chat(question: str) -> str:
         return f"Konnte keine Antwort erhalten: {exc}"
 
 
-def _safe_training_today() -> dict:
-    """Lädt Training-Heute-Empfehlung von der Fitness API."""
-    try:
-        resp = _api_client.post(
-            "/dashboard/training-today",
-            json={},
-            timeout=_TRAINING_TODAY_TIMEOUT,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("success"):
-            return data.get("data", {})
-        return {}
-    except Exception as exc:
-        logger.warning("[DASHBOARD] Fehler beim Laden von Training Today: %s", exc)
-        return {"error": str(exc)}
-
-
 # ------------------------------------------------------------------ #
 # Hauptseite
 # ------------------------------------------------------------------ #
@@ -149,13 +130,7 @@ def dashboard_index(request: Request):
 
 @app.get("/dashboard/training-today", response_class=HTMLResponse)
 def dashboard_training_today(request: Request):
-    """Lädt die langsame LLM-Empfehlung getrennt von der Hauptseite."""
-    template = templates.get_template("training_today.html")
-    html = template.render(
-        request=request,
-        training_today=_safe_training_today(),
-    )
-    return HTMLResponse(content=html)
+    raise HTTPException(410, "Trainingsempfehlungen sind deaktiviert.")
 
 
 # ------------------------------------------------------------------ #
@@ -215,6 +190,7 @@ def _render_template(
         week_stats=week_stats,
         chat_answer=chat_answer,
         training_today=training_today,
+        analyst=_safe_analyst(),
     )
     return HTMLResponse(content=html)
 
@@ -223,3 +199,32 @@ def _render_template(
 templates.env.filters["format_duration"] = _format_duration
 templates.env.filters["format_duration_short"] = _format_duration_short
 templates.env.filters["tss_color_class"] = _tss_color_class
+
+
+def _safe_analyst() -> dict:
+    try:
+        response = _api_client.get("/analyst/summary")
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return {"errors": ["Analyse-API nicht verfügbar"]}
+
+
+@app.put("/dashboard/races")
+def save_race(payload: dict):
+    try:
+        response = _api_client.put("/analyst/races", json=payload)
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, "Wettkampf konnte nicht gespeichert werden.") from exc
+
+
+@app.put("/dashboard/assignment")
+def save_assignment(payload: dict):
+    try:
+        response = _api_client.put("/analyst/assignment", json=payload)
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, "Planzuordnung konnte nicht gespeichert werden.") from exc

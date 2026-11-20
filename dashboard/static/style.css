@@ -763,3 +763,14 @@ footer {
     opacity: 0.5;
     filter: grayscale(0.5);
 }
+
+#fitness-chart { width: 100%; height: 280px; }
+.analyst-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; }
+.analyst-form label { display: flex; flex-direction: column; gap: .4rem; font-size: 1rem; }
+.analyst-form input, .analyst-form select, .analyst-form button { font: inherit; padding: .65rem; border: 1px solid #64748b; border-radius: .4rem; }
+.analyst-form output { grid-column: 1 / -1; }
+progress { width: 100%; }
+article { border-bottom: 1px solid #64748b; padding-block: 1rem; }
+canvas { display: block; }
+
+.preparation-chart { width: 100%; height: 180px; }

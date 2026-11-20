@@ -93,41 +93,12 @@ class DashboardRouteTests(unittest.TestCase):
         mock_client.post.assert_not_called()
 
     @patch("dashboard.routes._api_client")
-    def test_training_today_is_loaded_separately(self, mock_client):
-        """Die langsame Empfehlung blockiert nicht den initialen Seitenaufruf."""
-        training_response = MagicMock()
-        training_response.json.return_value = {
-            "success": True,
-            "data": {
-                "primary": {
-                    "sport": "Run",
-                    "type": "easy",
-                    "title": "Lockerer Lauf",
-                    "duration_min": 40,
-                    "details": "Ruhig laufen.",
-                },
-                "alternatives": [
-                    {
-                        "category": "hard",
-                        "sport": "Ride",
-                        "title": "Schwellenintervalle",
-                        "duration_min": 50,
-                        "details": "3 × 8 Minuten an der Schwelle.",
-                    },
-                ],
-                "reason": "Passt zum Gesamtbild.",
-                "warning": None,
-            },
-        }
-        mock_client.post.return_value = training_response
-
-        response = routes.dashboard_training_today(self._request())
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Lockerer Lauf", response.body.decode())
-        self.assertIn("BALLERN", response.body.decode())
-        self.assertIn("🚴 Ride", response.body.decode())
-        mock_client.post.assert_called_once()
+    def test_training_today_is_disabled(self, mock_client):
+        from fastapi import HTTPException
+        with self.assertRaises(HTTPException) as error:
+            routes.dashboard_training_today(self._request())
+        self.assertEqual(error.exception.status_code, 410)
+        mock_client.post.assert_not_called()
 
     def test_dashboard_healthcheck_has_no_external_dependency(self):
         """Der Container-Healthcheck ruft weder Fitness API noch LLM auf."""
@@ -152,8 +123,10 @@ class DashboardRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         html = response.body.decode()
-        self.assertIn("Training heute", html)
-        self.assertIn("training-today-loading", html)
+        self.assertIn("Nächster Wettkampf", html)
+        self.assertIn("Fitnessentwicklung", html)
+        self.assertIn("Trainingsfortschritt", html)
+        self.assertNotIn("training-today-loading", html)
         self.assertIn("Fitnesswerte", html)
         self.assertIn("7 Tage", html)
         self.assertIn("Letzte Aktivit", html)
@@ -193,7 +166,7 @@ class DashboardRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         html = response.body.decode()
-        self.assertIn("Training heute", html)
+        self.assertIn("Nächster Wettkampf", html)
         self.assertIn("placeholder", html)
 
     @patch("dashboard.routes._api_client")
@@ -469,3 +442,51 @@ class TssColorClassTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_assignment_proxy_handles_unavailable_api():
+    from fastapi import HTTPException
+    with patch.object(routes._api_client, "put", side_effect=httpx.ConnectError("offline")):
+        with unittest.TestCase().assertRaises(HTTPException) as error:
+            routes.save_assignment({"plan_id": "example"})
+        assert error.exception.status_code == 502
+
+
+def test_dashboard_renders_float_race_duration_without_llm(tmp_path):
+    from unittest.mock import Mock
+    from fitness.analyst import TrainingAnalyst
+    from fitness.archive import AnalystStore
+    from fitness.analyst_models import Race
+    from tests.test_analyst import TODAY
+    from tests.test_dashboard import DashboardRouteTests
+    from dashboard import routes
+    from unittest.mock import patch
+    client = Mock()
+    client.get_calendar.return_value = []
+    client.get_workouts.return_value = []
+    client.get_wellness_history.return_value = []
+    service = TrainingAnalyst(client, AnalystStore(tmp_path))
+    service.store.save_race(Race(name="Example Race", date="2026-11-20", target_seconds=20700))
+    summary = service.summary(TODAY)
+    with patch.object(routes, "_safe_summary", return_value={}), patch.object(routes, "_safe_analyst", return_value=summary), patch.object(routes, "_safe_chat") as llm:
+        html = routes.dashboard_index(DashboardRouteTests._request()).body.decode()
+        assert "5:45:00" in html and "Example Race" in html
+        llm.assert_not_called()
+
+
+
+def test_dashboard_shows_index_and_no_time_estimate():
+    from tests.test_preparation import evidence
+    from fitness.preparation import preparation_index
+    from dashboard import routes
+    from tests.test_dashboard import DashboardRouteTests
+    data = evidence()
+    race = data["race"]
+    summary = dict(races=[race], next_race=race, days_to_race=70,
+                   race_preparation={"race": dict(preparation_index(**data), history=[])})
+    with patch.object(routes, "_safe_summary", return_value={}), patch.object(routes, "_safe_analyst", return_value=summary):
+        html = routes.dashboard_index(DashboardRouteTests._request()).body.decode()
+    assert "100 %" in html
+    assert "keine Zielerreichungswahrscheinlichkeit" in html
+    assert "Aktuelle Schätzung" not in html and "Gesamtprognose" not in html
+    assert "Indexverlauf über die Wochen" in html

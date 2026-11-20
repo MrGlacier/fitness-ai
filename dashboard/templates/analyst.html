@@ -1,0 +1,83 @@
+<section class="card card-highlight">
+  <h2>Nächster Wettkampf</h2>
+  {% if analyst.get('errors') %}<p role="status">Datenquellen eingeschränkt: {{ analyst.errors|join(', ') }}</p>{% endif %}
+  {% set race = analyst.get('next_race') %}
+  {% if race %}
+    <h3>{{ race.name }}</h3><p>{{ race.date }} · {{ analyst.days_to_race }} Tage · Ziel: {{ race.target_seconds|format_duration }}</p>
+    {% set preparation = analyst.get('race_preparation', {}).get(race.id, {}) %}
+    <p>Vorbereitungsindex: {{ preparation.get('label', 'Datenlage unzureichend') }}</p>
+    <p>Vorbereitungsindex, keine Zielerreichungswahrscheinlichkeit.</p>
+  {% else %}<p class="placeholder">Kein kommender Wettkampf hinterlegt.</p>{% endif %}
+  {% set recognition = analyst.get('plan', {}) %}
+  {% set active = recognition.get('active') %}
+  <p>Plan: {{ active.name if active else 'Noch keine eindeutige Zuordnung' }} · {{ active.phases|join(', ') if active else recognition.get('status', 'unavailable') }}</p>
+</section>
+<section class="card">
+  <h2>Aktuelle Trainingswoche</h2>
+  {% set week = analyst.get('week', {}) %}
+  <p>{{ week.get('start', '—') }} · Planwoche {{ active.week if active else '—' }}</p>
+  <p>{{ week.get('planned_sessions', '—') }} geplant / {{ week.get('actual_sessions', '—') }} absolviert</p>
+  <p>Umfang Soll / Ist: {{ week.get('planned_duration_sec')|format_duration_short }} / {{ week.get('actual_duration_sec')|format_duration_short }}</p>
+  <p>TSS Soll / Ist: {{ week.get('planned_tss') if week.get('planned_tss') is not none else 'unvollständig' }} / {{ week.get('actual_tss') if week.get('actual_tss') is not none else 'unvollständig' }}</p>
+  {% if week.get('missing_duration') %}<p>Dauer fehlt bei {{ week.missing_duration }} Einheiten; Soll-Umfang unvollständig.</p>{% endif %}
+  <div class="table-wrapper"><table class="workout-table"><thead><tr><th>Datum</th><th>Einheit</th><th>Status</th><th>Dauerabweichung (s)</th><th>TSS-Abweichung</th></tr></thead><tbody>
+  {% for row in week.get('sessions', []) %}<tr><td>{{ row.event.date }}</td><td>{{ row.event.name }} · {{ row.event.sport }}</td><td>{{ row.status }}{% if row.actual_date %} · {{ row.actual_date }}{% endif %}</td><td>{{ row.duration_delta_sec if row.duration_delta_sec is not none else '—' }}</td><td>{{ row.tss_delta if row.tss_delta is not none else '—' }}</td></tr>{% endfor %}
+  </tbody></table></div><p>Unmatched: keine zuverlässige Zuordnung, nicht automatisch ausgefallen. Verschiebungen werden bis ±3 Tage gesucht.</p>
+  <details><summary>Intensitätsverteilung (Dauer nach mittlerer Einheitenintensität, keine Zeit-in-Zonen)</summary>{% for key, seconds in week.get('intensity_duration_sec', {}).items() %}<p>{{ key }}: {{ seconds|format_duration_short }}</p>{% endfor %}</details>
+  <details><summary>Vergleich der letzten acht Wochen</summary><div class="table-wrapper"><table class="workout-table"><thead><tr><th>Woche</th><th>Einheiten Soll / Ist</th><th>Umfang Soll / Ist</th><th>TSS Soll / Ist</th></tr></thead><tbody>{% for w in analyst.get('weekly_comparison', []) %}<tr><td>{{ w.start }}</td><td>{{ w.planned_sessions }} / {{ w.actual_sessions }}</td><td>{{ w.planned_duration_sec|format_duration_short }} / {{ w.actual_duration_sec|format_duration_short }}</td><td>{{ w.planned_tss }} / {{ w.actual_tss }}</td></tr>{% endfor %}</tbody></table></div></details>
+</section>
+<section class="card">
+  <h2>Fitnessentwicklung</h2>
+  <p>CTL (blau) · ATL (orange) · TSB (grün). Verlauf durchgezogen, Kalenderszenario gestrichelt.</p>
+  <canvas id="fitness-chart" aria-label="Historische und geplante CTL ATL TSB Entwicklung" role="img"></canvas>
+  {% set forecast = analyst.get('fitness_forecast', {}) %}
+  <p>{{ forecast.get('status', 'unavailable') }} · Planwerte sind keine absolvierten Belastungen. Leere Kalendertage werden als 0 TSS angenommen. Fehlende TSS unterbrechen die Prognose.</p>
+  {% if forecast.get('coverage_note') %}<p>{{ forecast.coverage_note }}</p>{% endif %}
+  {% set trend = analyst.get('fitness_trend') %}{% if trend %}<p>{{ trend['from'] }} bis {{ trend.to }}: CTL {{ trend.ctl_delta }} · ATL {{ trend.atl_delta }}</p>{% endif %}
+</section>
+<section class="card">
+  <h2>Trainingsfortschritt</h2>
+  {% if active %}<p>{{ active.name }} · Woche {{ active.week }} von {{ active.total_weeks }}</p><progress value="{{ active.week }}" max="{{ active.total_weeks }}"></progress><p>{{ active.elapsed_weeks }} vergangene Planwochen (kein Nachweis vollständig absolvierter Wochen). Nächste Phase: {{ active.next_phase or 'unbekannt' }}</p>{% else %}<p class="placeholder">Plan nicht eindeutig erkannt.</p>{% endif %}
+  {% for c in recognition.get('candidates', []) %}<p>{{ c.name }} · Woche {{ c.week }} · {{ c.phases|join(', ') }} · Evidenz: {{ c.evidence|join(', ') }} · Punkte {{ c.score }}</p>{% endfor %}
+  <form id="assignment-form" class="analyst-form"><label>Plan<select name="plan_id" required>{% for p in analyst.get('available_plans', []) %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label><label>Startdatum der Planwoche 1<input name="start_date" type="date" required></label><label>Zuordnung gültig bis<input name="end_date" type="date" required></label><button>Zuordnung speichern</button><output></output></form>
+</section>
+<section class="card">
+  <h2>Wettkampfvorbereitung & Ziele</h2>
+  <p>Vorbereitungsindex, keine Zielerreichungswahrscheinlichkeit. Keine wissenschaftlich validierte Genauigkeit. Fehlende Nachweise bleiben offen.</p>
+  {% for r in analyst.get('races', []) %}
+  <article><h3>{{ r.name }} · {{ r.date }}</h3>
+  {% set preparation = analyst.get('race_preparation', {}).get(r.id, {}) %}
+  <p><strong>{{ preparation.get('label', 'Datenlage unzureichend') }}</strong> · Ziel: {{ r.target_seconds|format_duration }}</p>
+  <p>Datenqualität: {{ preparation.get('data_quality', 'unvollständig') }} · {{ preparation.get('days_to_race', '—') }} Tage bis zum Wettkampf · Phase: {{ preparation.get('phase', [])|join(', ') }}</p>
+  <p>{{ preparation.get('method', '') }}</p>
+  {% for key, part in preparation.get('components', {}).items() %}
+    <details><summary>{{ part.label }}: {% if part.score is not none %}{{ part.score }} %{% elif part.get('status') == 'not_applicable' %}kein Zeitziel hinterlegt{% else %}Datenlage unzureichend{% endif %}</summary>
+    <p>{{ part.get('reason', '') }}</p>
+    {% for c in part.checks %}<p>{{ c.label }}: {{ c.score|round|int }} %{% if c.get('actual') is not none %} · Ist {{ c.actual }} / Referenz {{ c.reference }} {{ c.unit }}{% endif %}{% if c.get('pairs') %} · {{ c.pairs }} Vergleiche{% endif %}{% if c.get('change_percent') is not none %} · Veränderung {{ c.change_percent }} %{% endif %}</p>{% endfor %}
+    {% for reason in part.missing %}<p>{{ reason }}</p>{% endfor %}
+    {% if part.get('limitation') %}<p>{{ part.limitation }}</p>{% endif %}
+    {% if part.get('reference_weeks') %}<p>Referenz-Planwochen: {{ part.reference_weeks|join(', ') }}</p>{% endif %}
+    </details>
+  {% endfor %}
+  <p>Positive Faktoren: {{ preparation.get('positive_factors', [])|join(', ') or 'noch keine vollständig belegten Kriterien' }}</p>
+  <p>Begrenzende Faktoren: {% for factor in preparation.get('negative_factors', []) %}{{ factor.label }} ({{ factor.score }} %) {% else %}keine belegten Abweichungen; offene Nachweise beachten{% endfor %}</p>
+  <details><summary>Offene Nachweise</summary>{% for reason in preparation.get('missing', []) %}<p>{{ reason }}</p>{% endfor %}</details>
+  <canvas class="preparation-chart" data-race-id="{{ r.id }}" role="img" aria-label="Verlauf des Vorbereitungsindex von 0 bis 100 Prozent"></canvas>
+  <details><summary>Indexverlauf über die Wochen</summary><p>Tägliche Schnappschüsse ab Nutzung; keine rückwirkend erfundenen Werte. Nur dieselbe Modellversion vergleichen.</p>
+  <table class="workout-table"><thead><tr><th>Datum</th><th>Index</th><th>Hinterlegtes Ziel</th><th>Modell</th></tr></thead><tbody>{% for point in preparation.get('history', []) %}<tr><td>{{ point.day }}</td><td>{{ point.label }}</td><td>{{ point.target_seconds|format_duration }}</td><td>{{ point.model_version }}</td></tr>{% endfor %}</tbody></table></details>
+  <button type="button" class="edit-race" data-race='{{ r|tojson|forceescape }}'>Ziel bearbeiten</button></article>
+  {% endfor %}
+  <form id="race-form" class="analyst-form">
+    <input type="hidden" name="id"><input type="hidden" name="source_id">
+    <label>Name<input name="name" required maxlength="200"></label><label>Datum<input name="date" type="date" required></label>
+    <label>Sportart<select name="sport"><option>Triathlon</option><option>Run</option><option>Ride</option><option>Swim</option></select></label>
+    <label>Schwimmen km<input name="swim" type="number" min="0.001" step="any"></label><label>Rad km<input name="ride" type="number" min="0.001" step="any"></label><label>Lauf km<input name="run" type="number" min="0.001" step="any"></label>
+    <label>Zielzeit (Sekunden)<input name="target_seconds" type="number" min="1"></label><label>Wechsel gesamt (Sekunden)<input name="transition_seconds" type="number" min="0"></label>
+    <label>Schwimm-Ziel (Sekunden)<input name="split_swim" type="number" min="1"></label><label>Rad-Ziel (Sekunden)<input name="split_ride" type="number" min="1"></label><label>Lauf-Ziel (Sekunden)<input name="split_run" type="number" min="1"></label>
+    <p>Optionale Disziplinziele für den Triathlon-Zielvergleich; Summe plus Wechselzeit darf das Gesamtziel nicht überschreiten.</p>
+    <label>Leistungsziel<input name="performance_goal"></label><label>Priorität<select name="priority"><option value="">Keine</option><option>A</option><option>B</option><option>C</option></select></label>
+    <label>Status<select name="status"><option value="planned">Geplant</option><option value="completed">Absolviert</option><option value="cancelled">Abgesagt</option></select></label>
+    <button>Wettkampf speichern</button><button type="reset">Neuer Wettkampf</button><output></output>
+  </form>
+</section>
+<script id="analyst-data" type="application/json">{{ analyst|tojson }}</script>

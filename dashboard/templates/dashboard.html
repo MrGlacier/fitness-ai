@@ -11,7 +11,7 @@
         <div class="header-content">
             <div class="header-main">
                 <h1>Fitness AI</h1>
-                <span class="header-subtitle">Dein Trainings-Dashboard</span>
+                <span class="header-subtitle">Training & Wettkampf · Analyse</span>
             </div>
             {% if training_status or week_stats or last_workouts %}
                 <span class="api-status" title="API verbunden">
@@ -28,16 +28,7 @@
     </header>
 
     <main>
-        <!-- Training heute -->
-        <section class="card card-highlight training-today-card">
-            <h2>🎯 Training heute</h2>
-            <div class="training-today-content" id="training-today-content">
-                <div class="training-today-loading" id="training-today-loading">
-                    <div class="spinner"></div>
-                    <span>Trainingsempfehlung wird geladen…</span>
-                </div>
-            </div>
-        </section>
+        {% include 'analyst.html' %}
 
         <!-- Aktuelle Fitnesswerte -->
         <section class="card">
@@ -161,7 +152,7 @@
     </main>
 
     <footer>
-        <p>Fitness AI Dashboard · V1</p>
+        <p>Fitness AI · Trainings- und Wettkampfanalyst</p>
     </footer>
     <script src="/static/dashboard.js"></script>
 </body>
