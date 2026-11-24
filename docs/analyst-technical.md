@@ -160,7 +160,7 @@ Mehrdeutige lokale Datensätze müssen ausdrücklich über source_id verbunden
 werden. Entfernte Kalenderereignisse werden lokal nicht automatisch gelöscht.
 Triathlon-Distanzen werden nicht aus dem Rennnamen geraten, sondern lokal erfasst.
 
-## Wettkampfvorbereitung: preparation-v2
+## Getrennter Planvergleich: preparation-v2
 
 Die Rundanzeige liefert einen trainingsbasierten Index von 0 bis 100. Sie
 übernimmt nicht Garmins internes Modell und ist **keine kalibrierte statistische
@@ -241,8 +241,8 @@ Auch 100 bestätigt nur die ausgewerteten Kriterien und garantiert kein Zeitziel
    Zielzeit wird nicht aus Einzelannahmen bestätigt. Der Code beendet diesen
    Zweig vor dem Leistungsabgleich; er stellt keinen Mangel der Benutzereingaben
    und keinen Beleg fehlender Gesamtrennnachweise fest. Eine automatische
-   Ableitung der Gesamtziel-Erreichbarkeit aus Trainingsleistungen ist nicht
-   implementiert. Freiwillige Disziplinziele
+   Ableitung der Gesamtziel-Erreichbarkeit findet in diesem Planmodul nicht
+   statt. Dafür existiert nun das getrennte Zeitmodell `goal_predictions`. Freiwillige Disziplinziele
    können bei passenden Vergleichsrennen einen belegbaren Zielscore liefern.
    Fehlende oder widersprüchliche Zielnachweise werden nicht als Bestätigung
    gewertet und sperren die übrige Auswertung nicht.
@@ -253,7 +253,7 @@ Die SVG-Rundanzeige hat einen 270-Grad-Bogen mit vier Bereichen
 (0–24 rot, 25–49 orange, 50–74 gelb, 75–100 grün), Zeiger und Textwert.
 Die Farbbereiche sind visuelle Indexkategorien, keine medizinischen Grenzwerte.
 Planphase, Rennabstand, Teilwerte, Rohvergleiche, Abdeckung und Hinweise bleiben
-sichtbar bzw. aufklappbar. Die Anzeige heißt immer Wettkampfvorbereitung.
+sichtbar bzw. aufklappbar. Die separate Plananzeige heißt Wettkampfvorbereitung; die große Ziel-Uhr nutzt das neue Zeitmodell (siehe unten).
 `limiting_factor` liefert bei Werten unter 100 den niedrigsten Rohvergleich
 des begrenzenden Teilbereichs; er wird direkt unter der Uhr genannt. Bei 100
 heißt es ausschließlich, dass die ausgewerteten Vergleiche erfüllt sind.
@@ -275,6 +275,24 @@ statt einer erfundenen 0 oder 100; die Pauschalmeldung „Datenlage unzureichend
 sperrt vorhandene Trainingsanalysen nicht mehr. Das LLM darf ausschließlich die
 berechneten Werte interpretieren und muss Index, Datenabdeckung und tatsächliche
 Zielzeitnachweise auseinanderhalten.
+
+## Direkter Zeitvergleich: race-time-v1
+
+Der spätere Auftrag verlangt ausdrücklich wissenschaftlich begründete Zeitprognosen.
+`fitness/race_prediction.py` berechnet sie getrennt vom Planvergleich.
+`/analyst/summary` liefert `goal_predictions` zusätzlich zu `race_preparation`.
+Das MCP-Tool `get_training_analysis(section="races")` liefert beide und begrenzt
+die Einzelnachweise pro Disziplin auf fünf für den LLM-Kontext.
+`section="predictions"` liefert nur Wettkämpfe, Zielzeit-Schätzungen und Fehler,
+ohne Planvergleich oder Historie, damit Zielzeitfragen kompakt bleiben.
+Die Ziel-Uhr nutzt ausschließlich `goal_predictions`; Planerfüllung und CTL
+fließen nicht in ihre Berechnung ein. Die Modelle, Auswahlgrenzen und Quellen
+stehen in [race-prediction.md](race-prediction.md).
+
+Die lokale KI darf vorhandene Zeitspannen, Zielpositionen, Nachweise und Grenzen
+erklären. Sie darf keine Zeiten, Prozentchancen, künftigen Formgewinne oder
+wissenschaftliche Genauigkeit erfinden. Der Erklärknopf nutzt den bestehenden
+Chat-Endpunkt und das vorhandene lokale Modell; Backendparameter bleiben gleich.
 
 ## Betrieb und Prüfung
 

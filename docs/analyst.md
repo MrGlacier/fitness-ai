@@ -59,25 +59,65 @@ Eine Trainingsbeschreibung gilt nicht automatisch als persönlicher Kommentar.
 Das ist kein Nullwert. Historische Werte werden nicht mit heutigen Schwellenwerten ergänzt.
 
 Das Dashboard zeigt außerdem deinen aktuellen Plan, geplante und absolvierte Einheiten
-sowie Wettkämpfe. Die **Rundanzeige von 0 bis 100** fasst deine Trainingsbasis
-zusammen. Sie heißt immer **Wettkampfvorbereitung**, auch mit Zeitziel.
-Einzelne ungeklärte Zuordnungen blockieren sie nicht mehr; vorhandene Vergleiche
-werden ausgewertet und Hinweise stehen in den Details.
+sowie Wettkämpfe.
 
-Die Punkte zeigen, wie dein Training zum Plan und zu früheren Trainings passt.
-**Sie sagen nicht, ob du deine Wunschzeit schaffst.** Bei einem Triathlon mit
-Gesamtzeitziel berechnet die Anwendung diesen Zusammenhang bisher nicht. Das
-ist kein Eingabefehler und bedeutet nicht, dass du dein Ziel verfehlst.
-Du musst keine Einzelzielzeiten ergänzen.
+## Passt meine Wunschzeit?
 
-Der niedrigste ausgewertete Vergleich bestimmt die Zahl. Direkt unter der Uhr
-steht, welcher Vergleich den Wert begrenzt. 100 Punkte bedeuten nur, dass die
-ausgewerteten Vergleiche erfüllt sind; sie garantieren kein Rennergebnis.
-Betrachte vor allem die Begründungen und den Verlauf über mehrere Wochen.
-Kleine Punktänderungen beweisen keine Leistungsänderung. Unter den
-Teilbewertungen kannst du die Daten und offenen Hinweise nachlesen.
-Bei einem Quellenausfall zeigt die Anwendung nach Möglichkeit den datierten
-letzten Stand, statt einen neuen Wert zu erfinden.
+Die große Uhr beantwortet jetzt eine andere Frage als die Planerfüllung:
+**Wie passt deine Wunschzeit zu den Zeiten, die sich aus deinen aufgezeichneten
+Leistungen ergeben?** Daneben steht eine geschätzte Zeitspanne.
 
-[Technische Details, Berechnungsregeln und Schnittstellen](analyst-technical.md) ·
+- In der Mitte der Uhr steht die geschätzte Zeit. An den Enden des Bogens steht die Zeitspanne.
+- Der Zeiger zeigt deine Wunschzeit: links liegt das anspruchsvollere, schnellere Szenario; rechts liegt mehr Zeitreserve.
+- Außerhalb der Spanne bleibt der Zeiger am Rand. Grün ist keine Garantie. Die Uhr zeigt keine Prozentchance.
+- Training ist oft langsamer als ein Rennen. Eine grobe Trainingsschätzung zeigt deshalb nicht dein ganzes Potenzial.
+- Ohne Zeitziel bleibt die Zeitspanne sichtbar. Du brauchst keine Einzelzielzeiten.
+
+Bei einer ausdrücklich als **70.3** bezeichneten Triathlonveranstaltung werden
+1,9 km Schwimmen, 90 km Rad und 21,1 km Lauf als sichtbare Annahme verwendet.
+Andere Strecken trägst du beim Wettkampf ein. Für Bergläufe braucht die
+Auswertung auch die Höhenmeter; eine flache Laufpace reicht dafür nicht.
+
+Unter **So entsteht die Zeit-Einschätzung** siehst du die verwendeten Einheiten,
+Distanzen, Zeiten, ausgeschlossene Aufzeichnungen, wissenschaftlichen Quellen
+und Modellannahmen. Virtuelle Radgeschwindigkeiten werden nicht als reales
+Straßentempo verwendet. Fehlende Disziplinen werden nicht durch Fantasiezeiten
+ersetzt. Passende Teilschätzungen bleiben sichtbar.
+
+Mit **Von meiner lokalen KI erklären lassen** kannst du die berechnete
+Zeitspanne und ihre Grenzen in einfachen Worten erläutern lassen. Die KI
+berechnet keine eigenen Zeiten oder Erfolgsquoten.
+
+## Wie läuft meine Vorbereitung?
+
+Den bisherigen Vergleich mit deinem Trainingsplan und früheren Trainings
+findest du getrennt unter **Wie läuft deine Vorbereitung?**. Dessen niedrigster
+ausgewerteter Teilvergleich bestimmt den Vorbereitungswert. Diese Zahl prüft
+nicht deine Wunschzeit. Ein einzelnes ungeklärtes Training blockiert die
+übrige Auswertung nicht. Der Verlauf hilft beim Beobachten über mehrere Wochen;
+kleine Punktänderungen beweisen keine Leistungsänderung.
+
+Bei einem Ausfall der Aktivitätsquelle kann der Planvergleich einen datierten
+letzten Stand zeigen. Die Zielzeit-Auswertung berechnet währenddessen keine
+neue Zeitspanne.
+
+[Zeitmodelle, Quellen und Grenzen](race-prediction.md) ·
+[Technische Details und Schnittstellen](analyst-technical.md) ·
 [Trainingspläne importieren](../training_plans/README.md)
+
+## Fitness und farbige Formbereiche
+
+Das Diagramm zeigt oben Fitness (blau, CTL) mit leicht gefüllter Fläche und
+Ermüdung (violett, ATL). Darunter steht die Form separat: `TSB = CTL − ATL`,
+als absoluter Wert. Die farbigen Bereiche liegen bei −30, −10, +5 und +20.
+Auch die Formlinie wechselt entsprechend ihre Farbe. Das sind Modellbereiche,
+keine Gesundheits- oder Wettkampfleistungsbewertung.
+
+Durchgezogene Linien sind aufgezeichnete Werte, gestrichelte Linien ein
+Kalenderszenario. Fehlende Werte werden nicht verbunden. Die Zeitachse endet
+beim letzten berechenbaren Wert, damit ein leerer Prognosezeitraum die
+Trainingshistorie nicht zusammendrückt.
+
+Die Darstellung orientiert sich an der absoluten Formanzeige von Intervals.icu:
+[Formbereiche](https://forum.intervals.icu/t/form-fitness-rates/25502) und
+[Fitness-Anleitung](https://forum.intervals.icu/t/fitness-page-a-guide-to-getting-started/17702).

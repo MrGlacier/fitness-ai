@@ -324,10 +324,13 @@ importieren; `--dry-run` prüft vorher ohne Schreibzugriffe.
 Lokale Wettkämpfe/Ziele und manuelle Planzuordnungen im Dashboard pflegen.
 PDF/ältere XLS erfordern eine geprüfte strukturierte Übertragung; einfache
 XLSX-, CSV-, JSON- und Markdown-Tabellen werden deterministisch eingelesen.
-Eine Garmin-ähnliche Rundanzeige von 0 bis 100 zeigt die Wettkampfvorbereitung.
-Die Punkte vergleichen das Training mit dem Plan und früheren Trainings. Sie
-sagen nicht, ob die Leistung für eine Wunschzeit reicht. Der begrenzende
-Vergleich wird direkt angezeigt. Einzelne offene Zuordnungen sperren die
-Auswertung nicht.
-Teilbewertungen, Datenabdeckung und Indexverlauf bleiben nachvollziehbar;
-das LLM interpretiert ausschließlich die berechneten Werte.
+Die große Rundanzeige vergleicht die Wunschzeit jetzt direkt mit einer aus
+aufgezeichneten Leistungen berechneten Zeitspanne. Laufzeiten verwenden das
+Riegel-Potenzmodell; Triathlonzeiten kombinieren nachvollziehbare
+Disziplin-Szenarien und offen ausgewiesene Annahmen. Die Uhr zeigt in der Mitte die geschätzte Zeit und am Bogen die Lage der
+Wunschzeit, keine statistische Erfolgswahrscheinlichkeit.
+Trainingstempo ist keine gemessene Leistungsgrenze. Der bisherige Planvergleich
+bleibt getrennt erhalten. Die lokale KI erklärt berechnete Ergebnisse und ihre
+Belege, statt eigene Zahlen zu erfinden.
+
+[Modelle, wissenschaftliche Quellen und Grenzen](docs/race-prediction.md)
