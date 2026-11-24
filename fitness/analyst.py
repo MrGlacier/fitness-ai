@@ -108,6 +108,17 @@ class TrainingAnalyst:
         preparation = {}
         for race in races:
             index = preparation_index(race, workouts, comparison, history, active_plan, active, today, errors)
+            stored_history = self.store.preparation_history(race["id"])
+            if index["score"] is None and errors:
+                previous = next((point for point in reversed(stored_history)
+                                 if point.get("score") is not None and point.get("model_version") == index["model_version"]
+                                 and point.get("race_date") == race["date"] and point["day"] <= today.isoformat()
+                                 and point.get("target_seconds") == race.get("target_seconds")
+                                 and point.get("goal_splits_seconds", {}) == race.get("goal_splits_seconds", {})), None)
+                if previous and race["status"] == "planned" and race["date"] >= today.isoformat():
+                    index = {key: value for key, value in previous.items() if key != "day"}
+                    index.update(status="cached", stale=True,
+                                 data_quality=f"Letzter berechneter Stand vom {previous['day']}")
             if not errors:
                 with self.store.connect() as db:
                     db.execute("INSERT OR REPLACE INTO preparation_history VALUES(?,?,?)",

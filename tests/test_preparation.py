@@ -40,17 +40,21 @@ def test_complete_evidence_score_is_reproducible_and_bounded():
     assert a["score"] == 100 and a["status"] == "available"
     assert a["components"]["goal"]["status"] == "not_applicable"
     assert a["model_version"] == MODEL_VERSION
-    assert "keine Zielerreichungswahrscheinlichkeit" in a["notice"]
+    assert "Sie sagen nicht, ob du deine Wunschzeit schaffst" in a["notice"]
     assert "total_seconds" not in a
 
 
 def test_plan_compliance_alone_never_produces_score():
     data = evidence()
     data["workouts"] = data["workouts"][:3]
+    data["plan"] = None
+    data["wellness"] = []
     index = preparation_index(**data)
     assert index["components"]["plan"]["score"] == 100
     assert index["components"]["performance"]["score"] is None
-    assert index["score"] is None and index["label"] == "Datenlage unzureichend"
+    assert index["score"] is None
+    assert index["status"] == "waiting_for_training"
+    assert index["coverage"]["available"] == 1
 
 
 def test_weak_performance_caps_high_compliance():
@@ -68,9 +72,9 @@ def test_missing_data_is_neither_zero_nor_good():
     data = evidence()
     data["wellness"] = []
     index = preparation_index(**data)
-    assert index["components"]["tolerance"]["score"] is None
-    assert index["score"] is None
-    assert index["data_quality"] == "unvollständig"
+    assert index["components"]["tolerance"]["score"] == 100
+    assert index["components"]["tolerance"]["status"] == "partial"
+    assert index["score"] == 100 and index["status"] == "provisional"
     assert index["missing"]
 
 
@@ -93,11 +97,16 @@ def test_moved_sessions_get_same_credit():
 def test_unmatched_and_intensity_gaps_remain_open():
     data = evidence()
     data["comparison"]["sessions"][0]["activity_id"] = None
-    assert preparation_index(**data)["components"]["plan"]["score"] is None
+    result = preparation_index(**data)
+    assert result["components"]["plan"]["score"] == 67
+    assert result["components"]["plan"]["status"] == "partial"
+    assert result["score"] is not None
     data = evidence()
     for row in data["comparison"]["sessions"]:
         row["event"]["intensity_percent"] = None
-    assert preparation_index(**data)["score"] is None
+    result = preparation_index(**data)
+    assert result["score"] is not None
+    assert any("Intensität" in reason for reason in result["components"]["plan"]["missing"])
 
 
 def test_excess_load_or_intensity_is_not_a_bonus():
@@ -142,7 +151,8 @@ def test_triathlon_requires_discipline_evidence_but_not_split_targets():
     data = evidence(target=10000)
     data["race"].update(sport="Triathlon", distances_km={"Swim": 1.9, "Ride": 90, "Run": 21.1})
     index = preparation_index(**data)
-    assert index["score"] is None
+    assert index["score"] == 33  # Eine trainierte von drei erforderlichen Disziplinen.
+    assert index["status"] == "provisional"
     assert any("Swim" in m for m in index["components"]["performance"]["missing"])
     assert index["components"]["goal"]["score"] is None
     assert index["components"]["goal"]["status"] == "target_recorded"
@@ -158,7 +168,8 @@ def test_ctl_alone_has_no_effect():
 
 
 def test_failed_source_suppresses_number_and_finished_race_is_not_preparation():
-    assert preparation_index(**evidence(), errors=["calendar"])["score"] is None
+    assert preparation_index(**evidence(), errors=["activities"])["score"] is None
+    assert preparation_index(**evidence(), errors=["calendar"])["status"] == "provisional"
     data = evidence()
     data["race"]["status"] = "completed"
     assert preparation_index(**data)["score"] is None
@@ -184,11 +195,13 @@ def test_history_is_separate_and_survives_source_outage(tmp_path):
     service = TrainingAnalyst(client, store)
     summary = service.summary(TODAY)
     assert "race_predictions" not in summary
-    assert summary["race_preparation"]["race"]["score"] is None
+    assert summary["race_preparation"]["race"]["score"] is not None
     saved = store.preparation_history("race")
     assert len(saved) == 1 and "total_seconds" not in saved[0]
     client.get_workouts.side_effect = RuntimeError("offline")
-    service.summary(TODAY)
+    outage = service.summary(TODAY)["race_preparation"]["race"]
+    assert outage["status"] == "cached" and outage["stale"] is True
+    assert outage["score"] == saved[-1]["score"]
     assert store.preparation_history("race") == saved
     with store.connect() as db:
         assert db.execute("SELECT count(*) FROM predictions").fetchone()[0] == 1
@@ -224,7 +237,8 @@ def test_complete_triathlon_and_goal_budget():
     assert index["score"] == 100
     assert index["components"]["goal"]["status"] == "target_recorded"
     assert index["missing"] == []
-    assert index["data_quality"] == "Vorbereitung belegt; Zielvergleich offen"
+    assert index["scope"] == "training_preparation" and index["goal_note"]
+    assert index["coverage"]["available"] == 4
 
 
 def test_negative_values_cannot_escape_index_bounds():
@@ -237,7 +251,9 @@ def test_zero_wellness_observations_are_missing_not_recovery_evidence():
     data = evidence()
     for row in data["wellness"]:
         row.update(hrv=0, resting_hr=None, sleep_secs=0)
-    assert preparation_index(**data)["components"]["tolerance"]["score"] is None
+    part = preparation_index(**data)["components"]["tolerance"]
+    assert part["score"] == 100 and part["status"] == "partial"
+    assert len(part["checks"]) == 1  # Nur RPE, keine erfundenen Erholungswerte.
 
 
 def test_missing_distances_do_not_count_as_bad_endurance():
@@ -245,7 +261,8 @@ def test_missing_distances_do_not_count_as_bad_endurance():
     for w in data["workouts"]:
         w.distance_km = 0  # Existing activity mapping uses 0 when distance is unavailable.
     part = endurance(["Run"], data["workouts"], data["plan"], data["active"], 70, TODAY)
-    assert part["score"] is None
+    assert part["score"] == 100 and part["status"] == "partial"
+    assert all(c["unit"] != "km" for c in part["checks"])
     assert any("Ist-Distanzen" in reason for reason in part["missing"])
 
 
@@ -280,3 +297,88 @@ def test_distance_only_swim_load_is_measured_against_plan():
     swims = [w.model_copy(update={'sport': 'Swim', 'distance_km': 1.25}) for w in data['workouts']]
     part = endurance(['Swim'], swims, swim_plan, data['active'], 70, TODAY)
     assert part['score'] == 50
+
+
+def test_mixed_duration_cohorts_produce_explicit_efficiency_trend():
+    from fitness.preparation import performance_trend
+    workouts = []
+    for i in range(3):
+        for day, duration, hr, power in [(28+i, 1800+i*100, 100, 100), (7+i, 5400+i*100, 140, 126)]:
+            workouts.append(Workout(id=f"{day}", name="Example Ride", sport="Ride", duration_sec=duration,
+                                    distance_km=30, start_time=datetime.combine(TODAY-timedelta(days=day), datetime.min.time()),
+                                    avg_hr=hr, weighted_avg_watts=power))
+    result = performance_trend(["Ride"], workouts, TODAY)
+    assert result["score"] == 90
+    check = result["checks"][0]
+    assert check["method"] == "cohort_efficiency"
+    assert check["recent_sessions"] == check["previous_sessions"] == 3
+    assert check["limitation"]
+
+
+def test_nearest_activity_without_power_does_not_hide_valid_comparisons():
+    from fitness.preparation import performance_trend
+    data = evidence()
+    workouts = [w.model_copy(update={"sport": "Ride", "weighted_avg_watts": 200}) for w in data["workouts"]]
+    workouts += [w.model_copy(update={"id": "missing-"+w.id, "weighted_avg_watts": None, "duration_sec": 999}) for w in workouts[3:]]
+    result = performance_trend(["Ride"], workouts, TODAY)
+    assert result["score"] == 100 and result["checks"][0]["pairs"] == 3
+
+
+def test_partial_training_evidence_is_visible_without_fabricating_missing_trends():
+    data = evidence()
+    data["workouts"] = data["workouts"][:3]
+    result = preparation_index(**data)
+    assert result["score"] is not None and result["status"] == "provisional"
+    assert result["components"]["performance"]["score"] is None
+    assert result["coverage"]["available"] < result["coverage"]["total"]
+
+
+def test_no_recorded_activity_never_creates_an_invented_number():
+    data = evidence()
+    data["workouts"] = []
+    result = preparation_index(**data)
+    assert result["score"] is None and result["status"] == "waiting_for_training"
+    assert "unzureichend" not in result["label"]
+
+
+def test_cached_index_is_not_reused_for_a_changed_target(tmp_path):
+    data = evidence()
+    store = AnalystStore(tmp_path)
+    store.save_race(Race.model_validate(data["race"]))
+    client = Mock()
+    client.get_calendar.return_value = []
+    client.get_workouts.return_value = data["workouts"]
+    client.get_wellness_history.return_value = data["wellness"]
+    service = TrainingAnalyst(client, store)
+    assert service.summary(TODAY)["race_preparation"]["race"]["score"] is not None
+    store.save_race(Race.model_validate(dict(data["race"], target_seconds=2000)))
+    client.get_workouts.side_effect = RuntimeError("offline")
+    current = service.summary(TODAY)["race_preparation"]["race"]
+    assert current["score"] is None and current["status"] != "cached"
+
+
+def test_preparation_names_the_limiting_comparison_without_claiming_goal_confidence():
+    data = evidence()
+    for w in data["workouts"][3:]:
+        w.distance_km = 10
+    result = preparation_index(**data)
+    assert result["score"] == 50
+    assert result["gauge_title"] == "Wettkampfvorbereitung"
+    assert result["limiting_factor"]["label"].startswith("Laufen:")
+    assert result["limiting_factor"]["score"] == 50
+    assert preparation_index(**evidence())["limiting_factor"] is None
+    data["workouts"] = []
+    assert preparation_index(**data)["limiting_factor"] is None
+
+
+def test_total_triathlon_goal_is_not_misrepresented_as_missing_user_input():
+    data = evidence()
+    data["race"].update(sport="Triathlon", target_seconds=20000)
+    first = preparation_index(**data)
+    data["race"]["target_seconds"] = 30000
+    second = preparation_index(**data)
+    assert first["score"] == second["score"]
+    assert first["gauge_title"] == second["gauge_title"] == "Wettkampfvorbereitung"
+    assert first["scope"] == "training_preparation"
+    assert "kein Eingabefehler" in first["components"]["goal"]["limitation"]
+    assert "Das heißt nicht, dass du dein Ziel verfehlst" in first["goal_note"]
