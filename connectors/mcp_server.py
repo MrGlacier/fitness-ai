@@ -93,7 +93,7 @@ from fitness.analyst import TrainingAnalyst
 
 @mcp.tool()
 def get_training_analysis(section: str = "overview") -> dict:
-    """Analyst data: overview, week, plan, fitness, comparison or races. Deterministic fitness scenarios and preparation index (not goal probability); no race-time predictions or training generation."""
+    """Analyst data: overview, week, plan, fitness, comparison, races or predictions. Use predictions for calculated race-time scenarios, evidence and goal comparison; never a success probability. No training generation."""
     data = TrainingAnalyst(intervals_client_instance).summary()
     keys = {
         "overview": ["date", "errors", "next_race", "days_to_race", "plan", "fitness_trend"],
@@ -101,7 +101,8 @@ def get_training_analysis(section: str = "overview") -> dict:
         "plan": ["plan", "plan_context", "available_plans"],
         "fitness": ["fitness_history", "fitness_forecast", "fitness_trend", "errors"],
         "comparison": ["comparison", "weekly_comparison", "errors"],
-        "races": ["races", "race_preparation", "errors"],
+        "races": ["races", "race_preparation", "goal_predictions", "errors"],
+        "predictions": ["races", "goal_predictions", "errors"],
     }
     if section not in keys:
         return {"error": "Unknown section", "sections": list(keys)}
@@ -119,6 +120,10 @@ def get_training_analysis(section: str = "overview") -> dict:
     if section == "races":
         result["race_preparation"] = {key: dict(value, history=value["history"][-12:])
                                       for key, value in data["race_preparation"].items()}
+    if section in {"races", "predictions"}:
+        result["goal_predictions"] = {key: dict(value, parts=[dict(part, evidence=part["evidence"][-5:])
+                                                              for part in value["parts"]])
+                                      for key, value in data["goal_predictions"].items()}
     return result
 
 

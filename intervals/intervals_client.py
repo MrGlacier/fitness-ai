@@ -428,6 +428,8 @@ class IntervalsClient:
             sport = activity["type"],
             distance_km = meters_to_km(distance) if distance is not None else 0.0,
             duration_sec = activity["moving_time"],
+            elapsed_sec = activity.get("elapsed_time"),
+            is_indoor = activity.get("trainer"),
             avg_hr = activity.get("average_heartrate"),
             tss = activity.get("icu_training_load"),
             intensity = round(intensity, 2) if intensity is not None else None,

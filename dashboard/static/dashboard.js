@@ -3,36 +3,133 @@
     if (!node) return;
     const data = JSON.parse(node.textContent);
     const canvas = document.getElementById('fitness-chart');
+    // Absolute TSB bands, inspired by Intervals.icu. These describe model values.
+    const formBands = [
+        { min: -Infinity, max: -30, color: '#fa7182', fill: '#fa71821c' },
+        { min: -30, max: -10, color: '#64dcb1', fill: '#64dcb11c' },
+        { min: -10, max: 5, color: '#aab6c8', fill: '#aab6c812' },
+        { min: 5, max: 20, color: '#73bfff', fill: '#73bfff16' },
+        { min: 20, max: Infinity, color: '#e5ca58', fill: '#e5ca581a' },
+    ];
+    const formColor = value => formBands.find(b => value < b.max).color;
     function draw() {
+        if (!canvas) return;
         const history = data.fitness_history || [];
         const future = (data.fitness_forecast || {}).points || [];
-        const all = [...history, ...future];
+        const dated = [...history, ...future].filter(p => Number.isFinite(Date.parse(p.date)));
+        const usable = dated.filter(p => ['ctl', 'atl', 'tsb'].some(key => Number.isFinite(p[key])));
         const ctx = canvas.getContext('2d');
-        const width = canvas.clientWidth || 600, height = 280;
+        const width = canvas.clientWidth || 600, height = canvas.clientHeight || 360;
         canvas.width = width * devicePixelRatio; canvas.height = height * devicePixelRatio;
         ctx.scale(devicePixelRatio, devicePixelRatio);
-        if (!all.length) { ctx.fillText('Keine Verlaufsdaten verfügbar.', 20, 40); return; }
-        const values = all.flatMap(p => [p.ctl, p.atl, p.tsb]).filter(Number.isFinite);
-        if (!values.length) return;
-        const min = Math.min(0, ...values) - 5, max = Math.max(...values) + 5;
-        const begin = Date.parse(all[0].date), end = Date.parse(all.at(-1).date);
-        const x = p => 45 + (Date.parse(p.date) - begin) / (end - begin || 1) * (width - 65);
-        const y = v => 240 - (v - min) / (max - min) * 215;
-        ctx.font = '14px sans-serif'; ctx.fillStyle = '#a2b1c8';
-        for (let i = 0; i <= 4; i++) {
-            const v = min + (max-min)*i/4;
-            ctx.fillText(String(Math.round(v)), 2, y(v));
-            ctx.strokeStyle = '#293951'; ctx.beginPath(); ctx.moveTo(40,y(v)); ctx.lineTo(width-15,y(v)); ctx.stroke();
+        ctx.font = '12px sans-serif'; ctx.fillStyle = '#a2b1c8';
+        if (!usable.length) { ctx.fillText('Keine Verlaufsdaten verfügbar.', 20, 40); return; }
+
+        // Empty forecast tails must not squeeze the actual history into a corner.
+        const begin = Math.min(...usable.map(p => Date.parse(p.date)));
+        const end = Math.max(...usable.map(p => Date.parse(p.date)));
+        const left = 45, right = width - 12, top = 24;
+        const loadBottom = Math.round(height * .55), formTop = loadBottom + 34, bottom = height - 30;
+        const x = p => left + (Date.parse(p.date) - begin) / (end - begin || 1) * (right - left);
+        const loadValues = usable.flatMap(p => [p.ctl, p.atl]).filter(Number.isFinite);
+        const loadMin = Math.max(0, Math.floor(((loadValues.length ? Math.min(...loadValues) : 0) - 5) / 10) * 10);
+        const loadMax = Math.max(loadMin + 10, Math.ceil(((loadValues.length ? Math.max(...loadValues) : 10) + 5) / 10) * 10);
+        const formValues = usable.map(p => p.tsb).filter(Number.isFinite);
+        const formMin = Math.min(-40, Math.floor(((formValues.length ? Math.min(...formValues) : -30) - 3) / 10) * 10);
+        const formMax = Math.max(25, Math.ceil(((formValues.length ? Math.max(...formValues) : 20) + 3) / 10) * 10);
+        const loadY = v => loadBottom - (v - loadMin) / (loadMax - loadMin) * (loadBottom - top);
+        const formY = v => bottom - (v - formMin) / (formMax - formMin) * (bottom - formTop);
+
+        for (const band of formBands) {
+            const upper = formY(Math.min(formMax, band.max)), lower = formY(Math.max(formMin, band.min));
+            ctx.fillStyle = band.fill; ctx.fillRect(left, upper, right - left, lower - upper);
         }
-        for (const [key,color] of [['ctl','#73a8ff'],['atl','#ffb777'],['tsb','#64dcb1']]) {
-            for (const [points,dash] of [[history,[]],[[...(history.length ? [history.at(-1)] : []),...future],[6,5]]]) {
-                ctx.strokeStyle=color; ctx.setLineDash(dash); ctx.beginPath(); let started=false;
-                for (const p of points) { if (!Number.isFinite(p[key])) { started=false; continue; }
-                    if (!started) ctx.moveTo(x(p),y(p[key])); else ctx.lineTo(x(p),y(p[key])); started=true; }
-                ctx.stroke();
+        function horizontal(value, y) {
+            ctx.fillStyle = '#a2b1c8'; ctx.textAlign = 'right'; ctx.fillText(String(Math.round(value)), left - 9, y + 4);
+            ctx.strokeStyle = '#293951'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+        }
+        for (let i = 0; i <= 4; i++) {
+            const value = loadMin + (loadMax - loadMin) * i / 4;
+            horizontal(value, loadY(value));
+        }
+        for (const value of [-30, -10, 5, 20]) horizontal(value, formY(value));
+        ctx.fillStyle = '#a2b1c8'; ctx.textAlign = 'left';
+        ctx.fillText('Fitness / Ermüdung', left, 13); ctx.fillText('Form · TSB absolut', left, formTop - 10);
+
+        function groups(points, key) {
+            const result = []; let group = [], previous = null;
+            for (const p of points) {
+                const time = Date.parse(p.date);
+                if (!Number.isFinite(p[key]) || !Number.isFinite(time)) {
+                    if (group.length) result.push(group); group = []; previous = null; continue;
+                }
+                if (previous !== null && (time <= previous || time - previous > 129600000)) {
+                    if (group.length) result.push(group); group = [];
+                }
+                group.push(p); previous = time;
+            }
+            if (group.length) result.push(group);
+            return result;
+        }
+        function loadSeries(points, key, color, dash, fill) {
+            ctx.setLineDash(dash); ctx.lineDashOffset = 0;
+            for (const group of groups(points, key)) {
+                if (fill && group.length > 1) {
+                    ctx.beginPath(); ctx.moveTo(x(group[0]), loadBottom);
+                    for (const p of group) ctx.lineTo(x(p), loadY(p[key]));
+                    ctx.lineTo(x(group.at(-1)), loadBottom); ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+                }
+                ctx.beginPath(); group.forEach((p, i) => i ? ctx.lineTo(x(p), loadY(p[key])) : ctx.moveTo(x(p), loadY(p[key])));
+                ctx.strokeStyle = color; ctx.lineWidth = key === 'ctl' ? 2 : 1.5; ctx.stroke();
+                if (group.length === 1) { ctx.beginPath(); ctx.arc(x(group[0]), loadY(group[0][key]), 2, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); }
             }
         }
-        ctx.setLineDash([]); ctx.fillText(all[0].date, 40,270); ctx.fillText(all.at(-1).date,Math.max(40,width-110),270);
+        function formSeries(points, dash) {
+            ctx.setLineDash(dash); ctx.lineWidth = 2;
+            for (const group of groups(points, 'tsb')) {
+                let length = 0;
+                if (group.length === 1) { ctx.beginPath(); ctx.arc(x(group[0]), formY(group[0].tsb), 2, 0, Math.PI * 2); ctx.fillStyle = formColor(group[0].tsb); ctx.fill(); }
+                for (let i = 1; i < group.length; i++) {
+                    const a = group[i - 1], b = group[i], delta = b.tsb - a.tsb;
+                    const cuts = [0, 1];
+                    if (delta) for (const edge of [-30, -10, 5, 20]) {
+                        const t = (edge - a.tsb) / delta; if (t > 0 && t < 1) cuts.push(t);
+                    }
+                    cuts.sort((a, b) => a - b);
+                    for (let j = 1; j < cuts.length; j++) {
+                        const t0 = cuts[j - 1], t1 = cuts[j];
+                        const x0 = x(a) + (x(b) - x(a)) * t0, x1 = x(a) + (x(b) - x(a)) * t1;
+                        const y0 = formY(a.tsb + delta * t0), y1 = formY(a.tsb + delta * t1);
+                        ctx.lineDashOffset = -length; ctx.strokeStyle = formColor(a.tsb + delta * (t0 + t1) / 2);
+                        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+                        length += Math.hypot(x1 - x0, y1 - y0);
+                    }
+                }
+            }
+        }
+        const actual = history.filter(p => Number.isFinite(Date.parse(p.date))).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+        const planned = [...(actual.length ? [actual.at(-1)] : []), ...future];
+        loadSeries(actual, 'ctl', '#73bfff', [], '#73bfff18');
+        loadSeries(planned, 'ctl', '#73bfff', [6, 4], '#73bfff09');
+        loadSeries(actual, 'atl', '#aa8bff', []);
+        loadSeries(planned, 'atl', '#aa8bff', [6, 4]);
+        formSeries(actual, []); formSeries(planned, [6, 4]);
+        ctx.setLineDash([]); ctx.lineDashOffset = 0;
+        const today = Date.parse(data.date);
+        if (Number.isFinite(today) && today >= begin && today <= end) {
+            const px = x({ date: data.date }); ctx.setLineDash([3, 4]); ctx.strokeStyle = '#a2b1c866'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, bottom); ctx.stroke(); ctx.setLineDash([]);
+        }
+        const ticks = width < 450 ? 2 : 4;
+        ctx.fillStyle = '#a2b1c8';
+        for (let i = 0; i < ticks; i++) {
+            const time = begin + (end - begin) * i / (ticks - 1);
+            ctx.textAlign = i === 0 ? 'left' : i === ticks - 1 ? 'right' : 'center';
+            const iso = new Date(time).toISOString().slice(0, 10);
+            const label = (i === 0 || i === ticks - 1 ? iso : iso.slice(5)).split('-').reverse().join('.');
+            ctx.fillText(label, left + (right - left) * i / (ticks - 1), height - 7);
+        }
+        ctx.textAlign = 'left';
     }
     draw(); window.addEventListener('resize',draw);
     function drawPreparation() {
@@ -102,6 +199,7 @@
         const distances={}; for (const [field,sport] of [['swim','Swim'],['ride','Ride'],['run','Run']]) if(fields[field]) distances[sport]=Number(fields[field]);
         const payload={}; for(const key of ['id','source_id','name','date','sport','performance_goal','priority','status']) payload[key]=fields[key] || null;
         payload.target_seconds=durationSeconds(fields.target_time);
+        payload.elevation_gain_m=fields.elevation_gain_m ? Number(fields.elevation_gain_m) : null;
         payload.transition_seconds=fields.transition_minutes === '' ? null : Number(fields.transition_minutes)*60;
         const splits={}; for (const [field,sport] of [['split_swim_time','Swim'],['split_ride_time','Ride'],['split_run_time','Run']]) if(fields[field]) splits[sport]=durationSeconds(fields[field]);
         payload.goal_splits_seconds=splits;

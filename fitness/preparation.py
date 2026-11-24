@@ -227,7 +227,7 @@ def goal_alignment(race: dict, sports: list[str], workouts: list, today: date) -
         return dict(label="Bezug zum Wettkampfziel", score=None, status="target_recorded", checks=[], missing=[],
                     target_seconds=race["target_seconds"],
                     reason="Gesamtziel hinterlegt. Einzelzeiten und Wechselziele sind freiwillig und werden nicht verlangt.",
-                    limitation="Die Anwendung vergleicht deine Trainingsleistungen bisher nicht automatisch mit einer Triathlon-Gesamtzielzeit. Das ist kein Eingabefehler; Einzelzeiten musst du dafür nicht ergänzen.")
+                    limitation="Dieser Teil des Planvergleichs bewertet keine Triathlon-Gesamtzielzeit. Dafür gibt es die getrennte Zeit-Einschätzung aus deinen Leistungen. Das ist kein Eingabefehler; Einzelzeiten musst du dafür nicht ergänzen.")
     if triathlon and (set(splits) != set(sports) or race.get("transition_seconds") is None
                      or sum(splits.values()) + race["transition_seconds"] > race["target_seconds"]):
         missing.append("Zum Gesamtziel passende Disziplin-Zielzeiten und explizite Wechselzeit fehlen.")
@@ -295,7 +295,7 @@ def preparation_index(race: dict, workouts: list, comparison: dict, wellness: li
                 label=f"{score} / 100" if score is not None else verdict,
                 gauge_title="Wettkampfvorbereitung",
                 verdict=verdict, scope="training_preparation" if goal_open else "training_and_goal" if race.get("target_seconds") else "training_preparation",
-                goal_note="Deine Wunschzeit ist gespeichert. Ob deine Leistung dafür reicht, wird mit den vorhandenen Nachweisen bisher nicht berechnet. Das heißt nicht, dass du dein Ziel verfehlst." if goal_open else None,
+                goal_note="Dieser Wert vergleicht dein Training mit dem Plan und früheren Trainings. Er prüft nicht deine Wunschzeit; dafür gibt es die getrennte Zeit-Einschätzung. Das heißt nicht, dass du dein Ziel verfehlst." if goal_open else None,
                 limiting_factor=limiting_factor,
                 coverage=dict(available=observed, complete=complete, total=len(core)),
                 notice=NOTICE, components=components, missing=missing,

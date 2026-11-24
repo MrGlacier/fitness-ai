@@ -8,6 +8,7 @@ from fitness.analyst_models import Race
 from fitness.plan_analysis import compare_sessions, normalized, recognize_plan, workout_date, build_plan_context
 from fitness.projections import forecast_fitness
 from fitness.preparation import preparation_index
+from fitness.race_prediction import predict_race
 
 
 class TrainingAnalyst:
@@ -160,4 +161,5 @@ class TrainingAnalyst:
                               actual_tss=sum(w.tss for w in week_workouts) if all(w.tss is not None for w in week_workouts) else None,
                               intensity_duration_sec=intensity),
                     comparison=comparison, weekly_comparison=weekly, fitness_history=history,
-                    fitness_trend=trend, fitness_forecast=projection, race_preparation=preparation)
+                    fitness_trend=trend, fitness_forecast=projection, race_preparation=preparation,
+                    goal_predictions={race["id"]: predict_race(race, workouts, today, errors) for race in races})

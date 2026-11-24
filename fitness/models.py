@@ -160,6 +160,8 @@ class Workout(BaseModel):
     sport: str
     distance_km: float
     duration_sec: int
+    elapsed_sec: int | None = None
+    is_indoor: bool | None = None
     avg_hr: int | None = None
     tss: float | None = None
     intensity: float | None = None
