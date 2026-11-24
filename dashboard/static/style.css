@@ -1011,3 +1011,97 @@ footer {
     .site-header nav {flex-wrap:wrap;row-gap:.6rem}
     .history-page .comparison-actions>label {min-width:0;flex-basis:100%}
 }
+
+/* Trainingsbasierte Rundanzeige; alle Werte kommen aus dem Backend. */
+.race-confidence {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 210px);
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.race-goal-copy > strong {
+    display: block;
+    font-size: 2rem;
+    letter-spacing: -.045em;
+    margin-top: .3rem;
+}
+.confidence-instrument {
+    width: 100%;
+    max-width: 230px;
+    margin: .6rem auto;
+    text-align: center;
+}
+.confidence-title {
+    display: block;
+    font-size: .925rem;
+    color: var(--muted);
+}
+.confidence-dial {
+    display: block;
+    width: 100%;
+    overflow: visible;
+}
+.dial-track, .dial-segment {
+    fill: none;
+    stroke-width: 11;
+}
+.dial-track {
+    stroke: var(--line);
+}
+.dial-pointer {
+    stroke: var(--surface);
+    stroke-width: 4;
+}
+.dial-value {
+    fill: var(--text);
+    font-size: 44px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+.dial-unit, .dial-bound {
+    fill: var(--muted);
+    font-size: 14px;
+}
+.confidence-verdict {
+    display: block;
+    font-size: .925rem;
+    margin-top: .25rem;
+}
+.confidence-quality, .confidence-disclosure {
+    display: block;
+    color: var(--muted);
+    font-size: .875rem;
+    margin-top: .45rem;
+}
+.confidence-disclosure {
+    padding-top: .8rem;
+    border-top: 1px solid var(--line);
+}
+.confidence-instrument--compact {
+    max-width: 190px;
+    margin: 1rem auto;
+}
+.component-meter {
+    height: 5px;
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--line);
+    margin: .6rem 0;
+}
+.component-meter span {
+    display: block;
+    height: 100%;
+    background: var(--blue);
+}
+@media (max-width: 430px) {
+    .race-confidence {
+        grid-template-columns: 1fr;
+    }
+    .race-goal-copy {
+        text-align: center;
+    }
+    .confidence-instrument {
+        max-width: 220px;
+    }
+}

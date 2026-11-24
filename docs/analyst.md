@@ -59,8 +59,25 @@ Eine Trainingsbeschreibung gilt nicht automatisch als persönlicher Kommentar.
 Das ist kein Nullwert. Historische Werte werden nicht mit heutigen Schwellenwerten ergänzt.
 
 Das Dashboard zeigt außerdem deinen aktuellen Plan, geplante und absolvierte Einheiten
-sowie Wettkämpfe. Der **Vorbereitungsindex** fasst vorhandene Nachweise zusammen;
-er ist keine Wahrscheinlichkeit, eine Zielzeit zu erreichen.
+sowie Wettkämpfe. Die **Rundanzeige von 0 bis 100** fasst deine Trainingsbasis
+zusammen. Sie heißt immer **Wettkampfvorbereitung**, auch mit Zeitziel.
+Einzelne ungeklärte Zuordnungen blockieren sie nicht mehr; vorhandene Vergleiche
+werden ausgewertet und Hinweise stehen in den Details.
+
+Die Punkte zeigen, wie dein Training zum Plan und zu früheren Trainings passt.
+**Sie sagen nicht, ob du deine Wunschzeit schaffst.** Bei einem Triathlon mit
+Gesamtzeitziel berechnet die Anwendung diesen Zusammenhang bisher nicht. Das
+ist kein Eingabefehler und bedeutet nicht, dass du dein Ziel verfehlst.
+Du musst keine Einzelzielzeiten ergänzen.
+
+Der niedrigste ausgewertete Vergleich bestimmt die Zahl. Direkt unter der Uhr
+steht, welcher Vergleich den Wert begrenzt. 100 Punkte bedeuten nur, dass die
+ausgewerteten Vergleiche erfüllt sind; sie garantieren kein Rennergebnis.
+Betrachte vor allem die Begründungen und den Verlauf über mehrere Wochen.
+Kleine Punktänderungen beweisen keine Leistungsänderung. Unter den
+Teilbewertungen kannst du die Daten und offenen Hinweise nachlesen.
+Bei einem Quellenausfall zeigt die Anwendung nach Möglichkeit den datierten
+letzten Stand, statt einen neuen Wert zu erfinden.
 
 [Technische Details, Berechnungsregeln und Schnittstellen](analyst-technical.md) ·
 [Trainingspläne importieren](../training_plans/README.md)

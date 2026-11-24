@@ -1,0 +1,21 @@
+{% macro confidence_gauge(assessment, compact=false) %}
+{% set value = assessment.get('score') %}
+{% set geometry = value|gauge_geometry %}
+<div class="confidence-instrument {{ 'confidence-instrument--compact' if compact else '' }}">
+  <span class="confidence-title">Wettkampfvorbereitung</span>
+  <svg class="confidence-dial" viewBox="0 0 220 190" role="img" aria-label="Wettkampfvorbereitung: {{ (value|string + ' von 100') if value is not none else 'Noch kein Wert berechnet' }}">
+    <title>{{ assessment.get('notice', 'Die Punkte bewerten deine Vorbereitung. Sie sagen nicht, ob du deine Wunschzeit schaffst.') }}</title>
+    <path class="dial-track" d="M 54.85 165.15 A 78 78 0 1 1 165.15 165.15" pathLength="100"/>
+    {% for arc, color in [('M 54.85 165.15 A 78 78 0 0 1 37.94 80.15', '#fa7182'), ('M 37.94 80.15 A 78 78 0 0 1 110 32', '#ffa45c'), ('M 110 32 A 78 78 0 0 1 182.06 80.15', '#e5ca58'), ('M 182.06 80.15 A 78 78 0 0 1 165.15 165.15', '#68d98b')] %}
+    <path class="dial-segment" d="{{ arc }}" stroke="{{ color }}"/>
+    {% endfor %}
+    {% if geometry %}<circle class="dial-pointer" cx="{{ geometry.x }}" cy="{{ geometry.y }}" r="9" fill="{{ geometry.color }}"/>{% endif %}
+    <text class="dial-value" x="110" y="108" text-anchor="middle">{{ value if value is not none else '—' }}</text>
+    <text class="dial-unit" x="110" y="132" text-anchor="middle">von 100</text>
+    <text class="dial-bound" x="45" y="186" text-anchor="middle">0</text><text class="dial-bound" x="178" y="186" text-anchor="middle">100</text>
+  </svg>
+  <strong class="confidence-verdict">{{ assessment.get('verdict', 'Noch kein Wert berechnet') }}</strong>
+  {% if assessment.get("limiting_factor") %}<p class="confidence-quality">Das begrenzt den Wert:<br><strong>{{ assessment.limiting_factor.label }}</strong><br>{{ assessment.limiting_factor.component }}</p>{% endif %}
+  <span class="confidence-quality">{{ assessment.get('data_quality', '') }}</span>
+</div>
+{% endmacro %}

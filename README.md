@@ -304,8 +304,7 @@ uv add <paketname>
 Fitness AI analysiert externe Trainingspläne und reale Intervals-Daten. Sie
 erstellt keine Ersatzpläne und keine automatischen Trainingsempfehlungen.
 Das Dashboard zeigt Wettkampfziele, aktuelle Planwoche, Soll/Ist, Fitnessverlauf
-mit Kalenderszenario, Planfortschritt und einen nachvollziehbaren Vorbereitungsindex (0–100 %, keine
-Zielerreichungswahrscheinlichkeit).
+mit Kalenderszenario, Planfortschritt und einen nachvollziehbaren Vorbereitungsindex (0–100 Punkte).
 
 - [Bedienungsanleitung mit Vergleichsbeispiel](docs/analyst.md)
 - [Architektur, Modelle und Grenzen](docs/analyst-technical.md)
@@ -325,6 +324,10 @@ importieren; `--dry-run` prüft vorher ohne Schreibzugriffe.
 Lokale Wettkämpfe/Ziele und manuelle Planzuordnungen im Dashboard pflegen.
 PDF/ältere XLS erfordern eine geprüfte strukturierte Übertragung; einfache
 XLSX-, CSV-, JSON- und Markdown-Tabellen werden deterministisch eingelesen.
-Ohne geeignete Daten zeigt die Anwendung „Datenlage unzureichend“.
-Teilbewertungen, Datenqualität und Indexverlauf bleiben nachvollziehbar;
+Eine Garmin-ähnliche Rundanzeige von 0 bis 100 zeigt die Wettkampfvorbereitung.
+Die Punkte vergleichen das Training mit dem Plan und früheren Trainings. Sie
+sagen nicht, ob die Leistung für eine Wunschzeit reicht. Der begrenzende
+Vergleich wird direkt angezeigt. Einzelne offene Zuordnungen sperren die
+Auswertung nicht.
+Teilbewertungen, Datenabdeckung und Indexverlauf bleiben nachvollziehbar;
 das LLM interpretiert ausschließlich die berechneten Werte.

@@ -42,7 +42,7 @@
             chart.width=width*devicePixelRatio; chart.height=height*devicePixelRatio;
             ctx.scale(devicePixelRatio,devicePixelRatio); ctx.font='14px sans-serif'; ctx.fillStyle='#a2b1c8';
             for (const v of [0,50,100]) {
-                const y=150-v*1.2; ctx.fillText(String(v)+'%',0,y);
+                const y=150-v*1.2; ctx.fillText(String(v),0,y);
                 ctx.strokeStyle='#293951'; ctx.beginPath(); ctx.moveTo(45,y); ctx.lineTo(width-15,y); ctx.stroke();
             }
             if (!history.length) { ctx.fillText('Noch kein Indexverlauf vorhanden.',50,85); return; }

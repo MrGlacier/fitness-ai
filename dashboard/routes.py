@@ -1,6 +1,7 @@
 """Dashboard-Routes — reiner HTTP-Client zur Fitness API."""
 
 import httpx
+from math import cos, isfinite, radians, sin
 from typing import Annotated
 
 from fastapi import Form, Request, HTTPException
@@ -241,6 +242,19 @@ def _session_status(value: str) -> str:
 
 templates.env.filters["session_status"] = _session_status
 templates.env.filters["weekday_name"] = lambda value: {1: "Mo", 2: "Di", 3: "Mi", 4: "Do", 5: "Fr", 6: "Sa", 7: "So"}.get(value, "—")
+
+
+def _gauge_geometry(value: float | None) -> dict:
+    """Ordnet den bereits berechneten Index auf einem 270-Grad-Instrument an."""
+    if value is None or not isfinite(value):
+        return {}
+    score = max(0, min(100, value))
+    angle = radians(135 + score * 2.7)
+    color = "#fa7182" if score < 25 else "#ffa45c" if score < 50 else "#e5ca58" if score < 75 else "#68d98b"
+    return dict(x=round(110 + 78 * cos(angle), 2), y=round(110 + 78 * sin(angle), 2), color=color)
+
+
+templates.env.filters["gauge_geometry"] = _gauge_geometry
 
 
 @app.post("/dashboard/assignment")

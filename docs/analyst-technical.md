@@ -160,124 +160,121 @@ Mehrdeutige lokale Datensätze müssen ausdrücklich über source_id verbunden
 werden. Entfernte Kalenderereignisse werden lokal nicht automatisch gelöscht.
 Triathlon-Distanzen werden nicht aus dem Rennnamen geraten, sondern lokal erfasst.
 
-## Vorbereitungsindex: preparation-v1.2
+## Wettkampfvorbereitung: preparation-v2
 
-Der Index ist eine lokale, ausdrücklich **nicht wissenschaftlich validierte**
-Entscheidungshilfe. Er übernimmt weder Garmins internes Modell noch dessen
-Genauigkeit. **Vorbereitungsindex, keine Zielerreichungswahrscheinlichkeit.**
-Es werden keine Wettkampfzeiten vorhergesagt, auch nicht aus CTL oder TSS.
+Die Rundanzeige liefert einen trainingsbasierten Index von 0 bis 100. Sie
+übernimmt nicht Garmins internes Modell und ist **keine kalibrierte statistische
+Erfolgswahrscheinlichkeit**. Sie erzeugt keine Wettkampfzeitprognose. `scope`
+unterscheidet die allgemeine Trainingsbasis (`training_preparation`) von einem
+zusätzlich belegbaren Zielvergleich (`training_and_goal`). Ein gespeichertes
+Gesamtzeitziel allein macht aus der Trainingsbasis keine bestätigte Zielzeit.
 
-### Aggregation ohne Prozentgewichte
+### Nicht blockierende Aggregation
 
-Jeder belegte Vergleich ist ein Verhältnis zwischen Ist und expliziter Referenz,
-auf 0–100 begrenzt. 100 bedeutet nur: das jeweilige Kriterium wird erfüllt.
-Das Minimum der Vergleiche begrenzt die Teilbewertung; das Minimum der
-vollständigen Teilbewertungen begrenzt den Gesamtindex (Engpassmodell).
-Es gibt keine frei gewählten Prozentgewichtungen oder Kompensation einer
-schwachen Disziplin durch andere Stärken. Die Anzeige wird auf ganze Punkte
-gerundet, um zusätzliche Dezimalpräzision zu vermeiden.
+Pro Teilbereich begrenzt der schwächste auswertbare Vergleich dessen Score;
+der schwächste verfügbare Teilbereich begrenzt den Gesamtwert. Es gibt keine
+frei gewählten Prozentgewichtungen. Fehlende Kriterien erhalten weder 0 noch
+100. Sie stehen als Hinweise neben den tatsächlich berechneten Vergleichen.
+Ein einzelnes ungeklärtes Training blockiert weder den Planwert noch den
+Gesamtindex. Der Anteil bestätigter Zuordnungen ist ein gesonderter Vergleich:
+Er beschreibt die bestätigte Untergrenze der Planumsetzung, nicht die Anzahl
+angeblich ausgefallener Trainings.
 
-Das Minimum ist eine bewusste konservative Produktregel, kein physiologisches
-Gesetz. Alle folgenden Fenster, Mindeststichproben und Vergleichstoleranzen
-sind dokumentierte Heuristiken, keine validierten Grenzwerte. Teilbewertungen
-werden nur veröffentlicht, wenn ihre Mindestnachweise vollständig sind;
-vorhandene einzelne Vergleiche bleiben trotzdem sichtbar. Fehlt eine erforderliche
-Teilbewertung, erscheint statt der Gesamtzahl **Datenlage unzureichend**.
-Fehlende Werte werden weder als 0 noch als erfüllte Kriterien eingesetzt.
+`coverage` enthält die Zahl auswertbarer und vollständig belegter Kernbereiche
+von insgesamt vier. `provisional` kennzeichnet vorhandene Hinweise oder nur
+teilweise auswertbare Bereiche. Die Zahl selbst ist keine Messung dieser
+Datenqualität; es gibt keinen erfundenen Unsicherheitsabschlag. Planerfüllung
+allein erzeugt weiterhin keinen Gesamtwert: mindestens ein unabhängiger
+Leistungs- oder Ausdauervergleich muss vorliegen.
 
-### Teilbewertungen und Nachweise
+Fenster, Mindeststichproben, Vergleichstoleranzen und Farbbereiche sind
+reproduzierbare Produktheuristiken, keine wissenschaftlich validierten Grenzen.
+Auch 100 bestätigt nur die ausgewerteten Kriterien und garantiert kein Zeitziel.
 
-1. **Planerfüllung:** Soll-Datum zwischen heute−31 Tagen (einschließlich) und
-   heute−3 Tagen (ausschließlich); die letzte Verschiebungsfrist bleibt offen.
-   Mindestens drei vollständige Vergleiche je Dauer, TSS und mittlerer Intensität.
-   Pro Vergleich `100 × min(Soll,Ist)/max(Soll,Ist)`; über die Einheiten jeweils
-   der Median. Mehrlast erhält keinen Bonus. Explizit verschobene Einheiten
-   erhalten denselben Vergleich. Nicht zugeordnete Soll-Einheiten bleiben
-   ungeklärt und verhindern eine vollständige Teilbewertung, statt als Ausfall
-   zu zählen. Bekannt durchgeführte, aber in Umfang oder Intensität abweichende
-   Einheiten können dagegen belegte Abzüge ergeben.
-2. **Leistungsentwicklung:** Für jede Renndisziplin mindestens drei unabhängige
-   Paare aus den letzten 21 Tagen und den vorherigen 21 Tagen. Vergleichbare
-   Dauer ±20%, Puls höchstens 5 bpm auseinander; alternativ explizite Rennen
-   mit Distanz ±10% und ebenfalls vergleichbarer Dauer. Jede ältere Beobachtung
-   wird höchstens einmal verwendet, die Paarung erfolgt deterministisch nach
-   Dauerabstand und ID. Bei Rad: gewichtete Leistung, sonst Geschwindigkeit.
-   Median der Verhältnisse aktuell/früher, `100 × Verhältnis`, maximal 100.
-   Ein stabiler Wert erfüllt das Verlaufskriterium, ist allein kein Beleg der
-   Wettkampfbereitschaft. Veränderungen sind zusätzlich in Prozent sichtbar.
-   Fehlende historische FTP-Reihen werden nicht rekonstruiert. Strecke,
-   Wetter und Messgeräte bleiben mögliche Störfaktoren.
-3. **Wettkampfspezifische Ausdauer:** Alle drei Triathlon-Disziplinen, sonst die
-   Rennsportart. Referenz sind die aktuelle und zwei vorhergehende Planwochen,
-   niemals pauschal die spätere Peak-Phase. Innerhalb von 21 Tagen zum Rennen
-   sowie bei erkanntem Peak/Taper werden bis zu sieben vorherige Planwochen
-   herangezogen, damit ein reduzierter Taper nicht als ausreichender neuer
-   Ausdauernachweis gilt. Je Sport mindestens drei sichere Plan- und drei
-   Ist-Einheiten aus den letzten 28 Tagen. Vergleich des Medians der drei
-   längsten Einheiten mit dem entsprechenden Planmedian; falls mindestens
-   drei Distanzen vorliegen, zusätzlich Distanzvergleich. Wochenumfang ist
-   der Median der letzten drei vollständigen Kalenderwochen gegenüber dem
-   Median der referenzierten Planwochen. Verhältnis Ist/Plan, maximal 100.
-   Bei distanzbasierten Schwimmplänen werden lange Einheiten und Wochenumfang
-   ausschließlich in km bzw. km/Woche verglichen; fehlende Dauern werden nicht
-   geschätzt. Mindestens drei sichere Soll- und Ist-Distanzen sind erforderlich.
-   Fehlende Ist-Distanzen machen den Wochenumfang unvollständig. Zeitbasierte
-   Schwimmpläne bleiben unterstützt. Die Modellversion v1.1 trennt diese
-   Korrektur im Verlauf von früheren Bewertungen.
-   Unsichere/fehlende Referenzen der jeweils verwendeten Einheit verhindern die
-   vollständige Bewertung.
-   Der Index prüft hier die zum aktuellen Planabschnitt passende Vorbereitung;
-   er zertifiziert nicht die Eignung des externen Plans für die Renndistanz.
-4. **Belastungsverträglichkeit:** Drei unabhängige RPE-Paare derselben Sportart
-   bei vergleichbarer TSS (±20%) in den zwei 21-Tage-Fenstern; Score aus dem
-   Median RPE früher/aktuell. Zusätzlich mindestens ein Erholungsindikator
-   (HRV, Ruhepuls, Schlafdauer) mit mindestens sieben Messungen in jedem Fenster:
-   letzte 14 Tage gegen vorherige 28 Tage. HRV/Schlaf: aktueller Median/Basis;
-   Ruhepuls: Basis/aktueller Median. Verhältnis maximal 100. Es werden
-   unspezifische Beobachtungsindikatoren verglichen, keine Gesundheit,
-   Verletzungsgefahr oder kausale Verträglichkeit diagnostiziert. TSS dient
-   nur zur Vergleichbarkeit; CTL und TSB verändern diesen Teilscore nicht.
-5. **Zielbezug (optional):** Eine Gesamtzielzeit genügt als vollständige
-   Benutzerangabe. Einzelzeiten, Wechselziele und zusätzliche Distanzen sind
-   freiwillig. Ohne Zeitziel wird die Vorbereitung ohne Zeitvorgabe bewertet.
-   Ein Triathlon-Gesamtziel ohne Splits erhält den Status `target_recorded`;
-   mangels belastbarer Gesamtrennnachweise wird keine Zielerreichung behauptet.
-   Dieser offene Zielvergleich blockiert den allgemeinen Vorbereitungsindex nicht.
-   Wenn freiwillige Disziplinziele und passende Leistungsnachweise vorliegen,
-   bleibt ein belegbarer Zielvergleich möglich: je Disziplin zwei markierte
-   Rennen der letzten 90 Tage mit ±10% Zieldistanz, Vergleich der belegten
-   Geschwindigkeit mit der Zielanforderung. Ein belegter niedriger Zielscore
-   begrenzt den Index weiterhin. Unvollständige oder unpassende optionale Angaben
-   bleiben als offene Nachweise im Zielbereich sichtbar, zählen aber nicht als
-   schlechte Vorbereitung. Es werden keine Einzelziele aus der Gesamtzeit und
-   keine Disziplinzeiten aus FTP oder CTL geraten.
+### Verwendete Vergleiche
 
-Die Mindeststichproben und Mediane begrenzen den Einfluss einzelner Ausreißer.
-Eine vollständige Zahlenbewertung erfordert alle vier Kernbereiche. Ein
-belegbarer optionaler Zielvergleich kann sie zusätzlich begrenzen; ein noch
-nicht bewertbarer Zielbezug blockiert sie nicht. Bei gespeichertem Ziel ohne
-belegbaren Vergleich lautet die Datenqualität ausdrücklich
-„Vorbereitung belegt; Zielvergleich offen“. Ein Datenquellenausfall verhindert
-eine neue Gesamtzahl. Phase, Rennabstand, Referenzwochen, offene Nachweise,
-Vergleichswerte, Stichproben und positive/begrenzende Faktoren werden mitgeliefert.
-„Belegt, methodisch begrenzt“ ist eine qualitative Datenqualitätsangabe, kein
-statistisches Konfidenzmaß.
+1. **Planumsetzung:** Soll-Daten von heute−31 Tagen einschließlich bis heute−3
+   Tagen ausschließlich; die Verschiebungsfrist bleibt offen. Bestätigte
+   Einheiten/fällige Einheiten sowie Median der paarweisen Übereinstimmung bei
+   Dauer, TSS und mittlerer Intensität. Übereinstimmung ist
+   `100 × min(Soll,Ist)/max(Soll,Ist)`; Mehrlast erhält keinen Bonus. Fehlende
+   Metriken und ungeklärte Zuordnungen bleiben Hinweise. Vorhandene Vergleiche
+   werden auch bei weniger als drei Paaren angezeigt, mit entsprechender Notiz.
+2. **Leistungsentwicklung:** Zunächst unabhängige Direktpaare aus den letzten
+   21 und den vorherigen 21 Tagen: Dauer ±20%, Puls höchstens 5 bpm auseinander;
+   alternativ explizite Rennen mit Distanz ±10%. Beim Rad müssen beide Paare
+   einen Leistungswert haben, bevor die nächste Einheit ausgewählt wird.
+   Ab drei Direktpaaren wird deren medianes Verhältnis ausgewertet.
+   Kommen nicht genug Direktpaare zustande, nutzt das Modell die Mediane aus
+   mindestens drei Einheiten je Zeitfenster mit Puls und mindestens 15 Minuten
+   Dauer: Radleistung/Puls, sonst Geschwindigkeit/Puls. Das Verhältnis der
+   persönlichen Mediane aktuell/früher ergibt den auf 100 begrenzten Verlauf.
+   Dieser `cohort_efficiency`-Vergleich ist ein Beobachtungsindikator bei
+   gemischten Einheiten, kein kontrollierter Leistungstest. Intensität, Strecke,
+   Wetter und Geräte können ihn beeinflussen; diese Grenze wird mitgeliefert.
+   Falls auch das nicht möglich ist, bleiben ein oder zwei vorhandene Direktpaare
+   vorläufig nutzbar. Historische FTP-Werte werden nicht erfunden.
+3. **Ausdauer:** Referenz sind aktuelle und zwei vorherige Planwochen. Bei
+   Peak/Taper oder innerhalb von 21 Tagen bis zum Rennen reichen die Referenzen
+   bis zu sieben Wochen zurück. Mediane der drei längsten Plan-/Ist-Einheiten
+   und typischer Umfang der letzten drei vollständigen Kalenderwochen werden
+   verglichen. Distanzbasierte Schwimmpläne werden in km und km/Woche ausgewertet,
+   zeitbasierte Vorgaben in Sekunden und Sekunden/Woche. Fehlende Distanzen
+   werden nicht als 0 km gewertet; vorhandene Zeitvergleiche bleiben sichtbar.
+   Beim Triathlon begrenzt zusätzlich der Anteil in den letzten 28 Tagen
+   tatsächlich trainierter Wettkampfdisziplinen den Ausdauerwert. Eine reine
+   Laufvorbereitung kann dadurch nicht als vollständige Triathlon-Vorbereitung
+   erscheinen. Der Wert ist planrelativ und zertifiziert nicht die Eignung des
+   externen Plans für Renndistanz oder Gelände.
+4. **Belastungsverträglichkeit:** RPE-Paare gleicher Sportart bei ähnlicher TSS
+   (±20%) aus zwei 21-Tage-Fenstern; mindestens drei Paare für den RPE-Vergleich.
+   Zusätzlich persönliche Mediane von HRV, Ruhepuls oder Schlafdauer: letzte
+   14 Tage gegen vorherige 28 Tage, jeweils mindestens sieben Messungen.
+   RPE früher/aktuell, HRV bzw. Schlaf aktuell/früher, Ruhepuls früher/aktuell,
+   jeweils auf 100 begrenzt. Fehlende RPE blockiert vorhandene Erholungsvergleiche
+   nicht und umgekehrt. Das sind unspezifische Beobachtungen, keine medizinische
+   Diagnose und kein Beleg kausaler Verträglichkeit. CTL/TSB allein ändern
+   diesen Teilwert nicht.
+5. **Optionaler Zielvergleich:** Eine Gesamtzielzeit genügt als Benutzervorgabe.
+   Ohne Zeitziel wird die Vorbereitung ohne Zeitvorgabe bewertet. Bei einem
+   Triathlon-Gesamtziel ohne Splits lautet der Status `target_recorded`; die
+   Zielzeit wird nicht aus Einzelannahmen bestätigt. Der Code beendet diesen
+   Zweig vor dem Leistungsabgleich; er stellt keinen Mangel der Benutzereingaben
+   und keinen Beleg fehlender Gesamtrennnachweise fest. Eine automatische
+   Ableitung der Gesamtziel-Erreichbarkeit aus Trainingsleistungen ist nicht
+   implementiert. Freiwillige Disziplinziele
+   können bei passenden Vergleichsrennen einen belegbaren Zielscore liefern.
+   Fehlende oder widersprüchliche Zielnachweise werden nicht als Bestätigung
+   gewertet und sperren die übrige Auswertung nicht.
 
-### Verlauf, Dashboard und LLM
+### Anzeige, Verlauf und Ausfälle
 
-`race_preparation` ersetzt `race_predictions` in `/analyst/summary` und MCP.
-Das Dashboard zeigt Index, Teilbewertungen, Begründungen, Datenqualität,
-Einflussfaktoren und den täglichen Verlauf als Grafik und Tabelle über bis zu
-90 Tage. Verlauf entsteht ab Nutzung, ohne erfundene frühere Prozentwerte.
-Jeder Schnappschuss enthält `model_version`; die Grafik verbindet verschiedene
-Versionen nicht. `preparation_history` ist eine eigene SQLite-Tabelle.
-Alte Zeitschätzungen werden weder gelöscht noch in Indexwerte umgerechnet.
-Bei Datenquellenausfall wird der vorhandene Tagesschnappschuss nicht ersetzt.
+Die SVG-Rundanzeige hat einen 270-Grad-Bogen mit vier Bereichen
+(0–24 rot, 25–49 orange, 50–74 gelb, 75–100 grün), Zeiger und Textwert.
+Die Farbbereiche sind visuelle Indexkategorien, keine medizinischen Grenzwerte.
+Planphase, Rennabstand, Teilwerte, Rohvergleiche, Abdeckung und Hinweise bleiben
+sichtbar bzw. aufklappbar. Die Anzeige heißt immer Wettkampfvorbereitung.
+`limiting_factor` liefert bei Werten unter 100 den niedrigsten Rohvergleich
+des begrenzenden Teilbereichs; er wird direkt unter der Uhr genannt. Bei 100
+heißt es ausschließlich, dass die ausgewerteten Vergleiche erfüllt sind.
+Die Farbbereiche werden nicht mit frei gewählten Leistungsurteilen verknüpft.
+Ein offener Zielzeitbezug wird in einfachen Worten neben der Anzeige erklärt:
+Die Punkte sagen nicht, ob die Leistung für die Wunschzeit reicht. Der Verlauf
+ist als Beobachtungshilfe über Wochen gedacht, kleine Änderungen beweisen
+keinen Leistungsfortschritt.
 
-Nur Anwendungscode (`fitness/preparation.py`) berechnet Indexwerte. Der Chat
-nutzt berechnete Teilbewertungen und darf keine eigenen Prozentzahlen oder
-Wettkampfzeitprognosen erzeugen. Lokale Disziplin-Zielzeiten sind ausdrücklich
-Benutzervorgaben und werden im Dashboard in Sekunden bearbeitet.
+Es werden keine früheren Zahlen erfunden. Tägliche Schnappschüsse behalten
+`model_version`; unterschiedliche Versionen werden im Diagramm nicht verbunden.
+Ist die Aktivitätsquelle ausgefallen, kann ein ausdrücklich datierter letzter
+Wert derselben Modellversion, desselben Renntermins und desselben Ziels angezeigt
+werden (`cached`, `stale`). Er wird nicht als neue Berechnung gespeichert.
+Bei geändertem Ziel wird kein alter passender Wert vorgetäuscht.
+
+Ohne tatsächlich auswertbare Aktivitäts-/Vergleichsdaten erscheint ein Ladezustand
+statt einer erfundenen 0 oder 100; die Pauschalmeldung „Datenlage unzureichend“
+sperrt vorhandene Trainingsanalysen nicht mehr. Das LLM darf ausschließlich die
+berechneten Werte interpretieren und muss Index, Datenabdeckung und tatsächliche
+Zielzeitnachweise auseinanderhalten.
 
 ## Betrieb und Prüfung
 

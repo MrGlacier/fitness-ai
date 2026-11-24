@@ -486,10 +486,12 @@ def test_dashboard_shows_index_and_no_time_estimate():
                    race_preparation={"race": dict(preparation_index(**data), history=[])})
     with patch.object(routes, "_safe_summary", return_value={}), patch.object(routes, "_safe_analyst", return_value=summary):
         html = routes.dashboard_index(DashboardRouteTests._request()).body.decode()
-    assert "100 %" in html
-    assert "keine Zielerreichungswahrscheinlichkeit" in html
+    assert "100 / 100" in html
+    assert "Sie sagen nicht, ob du deine Wunschzeit schaffst" in html
     assert "Aktuelle Schätzung" not in html and "Gesamtprognose" not in html
-    assert "Indexverlauf über die Wochen" in html
+    assert "Verlauf deiner Wettkampfvorbereitung" in html
+    assert "Zielzuversicht" not in html
+    assert "Der niedrigste ausgewertete Vergleich bestimmt die Zahl" in html
 
 
 def test_dashboard_prefills_saved_assignment_and_uses_native_form():
@@ -518,3 +520,43 @@ def test_native_assignment_save_redirects_and_keeps_validation_errors():
             routes.save_assignment({})
         assert error.exception.status_code == 422
         assert error.exception.detail == "Start muss Montag sein"
+
+
+def test_gauge_geometry_maps_endpoints_and_midpoint():
+    import math
+    left, top, right = [routes._gauge_geometry(value) for value in [0, 50, 100]]
+    assert left['x'] < 110 < right['x']
+    assert math.isclose(left['y'], right['y'])
+    assert top['x'] == 110 and top['y'] == 32
+    assert routes._gauge_geometry(None) == {}
+    assert routes._gauge_geometry(-1) == left
+    assert routes._gauge_geometry(101) == right
+
+
+def test_dial_explains_the_actual_limiting_comparison():
+    from tests.test_preparation import evidence
+    from fitness.preparation import preparation_index
+    data = evidence()
+    for workout in data["workouts"][3:]:
+        workout.distance_km = 10
+    assessment = preparation_index(**data)
+    dial = routes.templates.env.get_template("confidence_gauge.html").module.confidence_gauge
+    html = str(dial(assessment))
+    assert "Wettkampfvorbereitung: 50 von 100" in html
+    assert "Das begrenzt den Wert:" in html
+    assert assessment["limiting_factor"]["label"] in html
+    assert assessment["limiting_factor"]["component"] in html
+    assert "Zielzuversicht" not in html
+
+
+def test_dashboard_renders_accessible_dial_and_real_zero_value():
+    summary = dict(races=[dict(id='example', name='Example Race', date='2027-01-01', sport='Run', target_seconds=None,
+                               distances_km={}, transition_seconds=None)],
+                   race_preparation={'example': dict(score=0, label='0 / 100', gauge_title='Wettkampfvorbereitung',
+                                                    verdict='Deutliche Abweichungen', components={}, history=[])})
+    with patch.object(routes, '_safe_summary', return_value={}), patch.object(routes, '_safe_analyst', return_value=summary):
+        html = routes.dashboard_index(DashboardRouteTests._request()).body.decode()
+    assert 'Wettkampfvorbereitung: 0 von 100' in html
+    assert 'class="dial-pointer"' in html
+    assert 'Datenlage unzureichend' not in html
+    assert 'Die Punkte bewerten deine Vorbereitung' in html
