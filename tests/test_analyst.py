@@ -105,6 +105,63 @@ def test_pairing_and_ambiguity():
     assert all(r["status"] == "uncertain" for r in rows)
 
 
+@pytest.mark.parametrize("pairing", [None, "activity", "event"])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_extended_run_completes_same_day_session(pairing, reverse):
+    scheduled = dict(event(), name="Base: 0h35 Easy + Strides", duration_sec=2100)
+    later = dict(event("2"), date="2026-11-18", name="Base: 0h45 Easy", duration_sec=2700)
+    activity = workout(day=scheduled["date"], name=later["name"], duration_sec=3300,
+                       paired_event_id="2" if pairing == "activity" else None)
+    if pairing == "event":
+        later["activity_id"] = activity.id
+    events = [scheduled, later]
+    result = compare_sessions(list(reversed(events)) if reverse else events, [activity], TODAY)
+    rows = {row["event"]["id"]: row for row in result["sessions"]}
+    assert rows["1"]["status"] == "completed"
+    assert rows["1"]["activity_id"] == activity.id
+    assert rows["1"]["duration_delta_sec"] == 1200
+    assert rows["2"]["status"] == "planned"
+    assert rows["2"]["activity_id"] is None
+    assert result["unplanned_activity_ids"] == []
+
+
+def test_unique_same_day_session_accepts_generic_activity_name():
+    activity = workout(day=event()["date"], name="Morning jog", duration_sec=4800)
+    row = compare_sessions([event()], [activity], TODAY)["sessions"][0]
+    assert row["status"] == "completed"
+    assert row["duration_delta_sec"] == 1200
+
+
+def test_multiple_same_day_activities_remain_ambiguous():
+    activities = [workout("a", day=event()["date"], name="Morning jog"),
+                  workout("b", day=event()["date"], name="Evening jog")]
+    result = compare_sessions([event()], activities, TODAY)
+    assert result["sessions"][0]["status"] == "uncertain"
+    assert result["unplanned_activity_ids"] == ["a", "b"]
+
+
+def test_multiple_same_day_sessions_remain_ambiguous():
+    activity = workout(day=event()["date"], name="Morning jog")
+    result = compare_sessions([event(), event("2")], [activity], TODAY)
+    assert all(row["status"] == "uncertain" for row in result["sessions"])
+    assert result["unplanned_activity_ids"] == [activity.id]
+
+
+def test_same_day_session_does_not_steal_activity_linked_outside_calendar():
+    activity = workout(day=event()["date"], paired_event_id="outside")
+    result = compare_sessions([event()], [activity], TODAY)
+    assert result["sessions"][0]["activity_id"] is None
+    assert result["unplanned_activity_ids"] == [activity.id]
+
+
+def test_conflicting_same_day_links_remain_uncertain():
+    activities = [workout("a", day=event()["date"], paired_event_id="1"),
+                  workout("b", paired_event_id="1")]
+    row = compare_sessions([event()], activities, TODAY)["sessions"][0]
+    assert row["status"] == "uncertain"
+    assert row["activity_id"] is None
+
+
 def test_forecast_math_and_missing_load():
     seed = dict(date="2026-11-15", ctl=40, atl=50)
     first = forecast_fitness(seed, [event()], date(2026, 11, 16))["points"][0]

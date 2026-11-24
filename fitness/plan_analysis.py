@@ -99,7 +99,7 @@ def recognize_plan(plans: list[TrainingPlan], events: list[dict], today: date,
 
 
 def compare_sessions(events: list[dict], workouts: list, today: date) -> dict:
-    """Explicit pairing wins; fallback requires sport, name and a unique candidate."""
+    """Eindeutige Einheiten am selben Tag bevorzugen; eine andere Dauer ist keine Verschiebung."""
     matches = {}
     used = set()
     explicit_proposals = {}
@@ -107,6 +107,34 @@ def compare_sessions(events: list[dict], workouts: list, today: date) -> dict:
         explicit_proposals[event["id"]] = [
             w for w in workouts if str(getattr(w, "paired_event_id", "")) == event["id"]
             or w.id == event.get("activity_id")]
+    # Intervals kann ein verlängertes Training einer ähnlichen Einheit an einem
+    # anderen Tag zuordnen. Die eindeutige Einheit derselben Sportart am
+    # tatsächlichen Trainingstag hat Vorrang. Widersprüchliche Verknüpfungen und
+    # Verknüpfungen außerhalb des verfügbaren Kalenders bleiben geschützt.
+    event_ids = {event["id"] for event in events}
+    same_day_proposals = {}
+    for event in events:
+        same_day_proposals[event["id"]] = [
+            w for w in workouts
+            if workout_date(w).isoformat() == event["date"]
+            and sport_family(w.sport) == sport_family(event.get("sport", ""))
+            and (getattr(w, "paired_event_id", None) is None or w.paired_event_id in event_ids)
+            and sum(any(candidate.id == w.id for candidate in values)
+                    for values in explicit_proposals.values()) <= 1
+            and all(len(values) == 1 for values in explicit_proposals.values()
+                    if any(candidate.id == w.id for candidate in values))
+            and (not explicit_proposals[event["id"]]
+                 or any(candidate.id == w.id for candidate in explicit_proposals[event["id"]]))
+        ]
+    for event_id, possible in same_day_proposals.items():
+        if len(possible) == 1 and sum(any(w.id == possible[0].id for w in values)
+                                     for values in same_day_proposals.values()) == 1:
+            activity = possible[0]
+            evidence = "paired" if activity in explicit_proposals[event_id] else "sport/date"
+            matches[event_id] = (activity, evidence)
+            used.add(activity.id)
+    explicit_proposals = {key: [w for w in values if w.id not in used]
+                          for key, values in explicit_proposals.items()}
     explicit_ids = {w.id for values in explicit_proposals.values() for w in values}
     for event_id, possible in explicit_proposals.items():
         if len(possible) == 1 and sum(any(w.id == possible[0].id for w in values)
@@ -122,13 +150,13 @@ def compare_sessions(events: list[dict], workouts: list, today: date) -> dict:
             continue
         possible = []
         for w in workouts:
-            if w.id in explicit_ids or getattr(w, "paired_event_id", None) is not None:
+            if w.id in used or w.id in explicit_ids or getattr(w, "paired_event_id", None) is not None:
                 continue
             if sport_family(w.sport) != sport_family(event.get("sport", "")):
                 continue
             delta = abs((workout_date(w) - date.fromisoformat(event["date"])).days)
             similarity = SequenceMatcher(None, normalized(event["name"]), normalized(w.name)).ratio()
-            if delta <= 3 and similarity >= .72:
+            if delta == 0 or (delta <= 3 and similarity >= .72):
                 possible.append(w)
         proposals[event["id"]] = possible
     for key, possible in proposals.items():
