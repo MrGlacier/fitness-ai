@@ -98,7 +98,7 @@ def get_training_analysis(section: str = "overview") -> dict:
     keys = {
         "overview": ["date", "errors", "next_race", "days_to_race", "plan", "fitness_trend"],
         "week": ["date", "errors", "week", "weekly_comparison"],
-        "plan": ["plan", "available_plans"],
+        "plan": ["plan", "plan_context", "available_plans"],
         "fitness": ["fitness_history", "fitness_forecast", "fitness_trend", "errors"],
         "comparison": ["comparison", "weekly_comparison", "errors"],
         "races": ["races", "race_preparation", "errors"],
@@ -133,10 +133,51 @@ def search_training_plan(query: str, plan_id: str | None = None, week: int | Non
         for session in plan.sessions:
             if week is not None and session.week != week:
                 continue
-            row = session.model_dump(mode="json")
+            row = session.model_dump(mode="json", exclude={"source_details"})
             if query.casefold() in str(row).casefold():
                 results.append(dict(plan_id=plan.id, **row))
     return results[:30]
+
+from fitness.history import HistoricalAnalysis
+from fitness.history_models import HistoryComparison
+
+
+@mcp.tool()
+def get_historical_comparison(start_a: str, end_a: str, start_b: str, end_b: str,
+                              sport: str = "all", race_date_a: str | None = None,
+                              race_date_b: str | None = None, include_comments: bool = False) -> dict:
+    """Compare two real athlete-local periods (ISO dates, <=366 days each). Deterministic metrics, missing data, phases and activity references. include_comments loads original comments for up to three similar pairs. No present-day threshold substitution."""
+    request = HistoryComparison.model_validate(dict(a=dict(start=start_a, end=end_a, race_date=race_date_a),
+                                                   b=dict(start=start_b, end=end_b, race_date=race_date_b), sport=sport))
+    return HistoricalAnalysis(intervals_client_instance).compact_comparison(request, include_comments=include_comments)
+
+
+@mcp.tool()
+def get_historical_preparations() -> dict:
+    """Read saved historical preparations and manual phase/week assignments. Race dates are entered explicitly, never guessed."""
+    data = HistoricalAnalysis(intervals_client_instance).catalog()
+    candidates = data["phase_candidates"]
+    data["phase_candidates"] = candidates[-80:]
+    data["omitted_candidates"] = max(0, len(candidates)-80)
+    return data
+
+
+@mcp.tool()
+def get_historical_session_pair(a_id: str, b_id: str) -> dict:
+    """Read two previously loaded activity snapshots and their original dated comments, personal authorship, RPE and measured differences. Use to interpret subjective experience; descriptions are not personal comments."""
+    data = HistoricalAnalysis(intervals_client_instance).session_pair(a_id, b_id)
+    for key in ("a", "b"):
+        details = data[key].get("details", {})
+        details["omitted_intervals"] = max(0, len(details.get("intervals", []))-20)
+        details["intervals"] = details.get("intervals", [])[:20]
+        details["description"] = details.get("description", "")[:1500]
+        data[key]["description"] = data[key].get("description", "")[:1500]
+    for key in ("comments_a", "comments_b"):
+        comments = data[key].get("comments", [])
+        data[key]["omitted_comments"] = max(0, len(comments)-10)
+        data[key]["comments"] = [dict(c, text=c["text"][:1500], text_truncated=len(c["text"]) > 1500) for c in comments[:10]]
+    return data
+
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

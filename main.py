@@ -2,13 +2,15 @@ import sys
 import asyncio
 
 from fitness.fitness_agent import FitnessAgent
+from fitness.analyst import TrainingAnalyst
 from llm.llm_client import LlmClient
 from connectors.mcp_client import McpClient
 
 async def main():
     mcp_client = McpClient()
     llm_client = LlmClient()
-    fitness_agent = FitnessAgent(llm_client_instance=llm_client, mcp_client_instance=mcp_client)
+    fitness_agent = FitnessAgent(llm_client_instance=llm_client, mcp_client_instance=mcp_client,
+                                 plan_context_provider=lambda: TrainingAnalyst(None).local_plan_context())
 
     if len(sys.argv) <= 1:
         print(

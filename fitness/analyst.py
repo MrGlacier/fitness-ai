@@ -5,7 +5,7 @@ import json
 from core.logger import logger
 from fitness.archive import AnalystStore
 from fitness.analyst_models import Race
-from fitness.plan_analysis import compare_sessions, normalized, recognize_plan, workout_date
+from fitness.plan_analysis import compare_sessions, normalized, recognize_plan, workout_date, build_plan_context
 from fitness.projections import forecast_fitness
 from fitness.preparation import preparation_index
 
@@ -38,6 +38,20 @@ class TrainingAnalyst:
                 races.append(race)
             self.store.save_race(Race.model_validate(race))
         return sorted(races, key=lambda r: (r["date"], r["id"]))
+
+    def local_plan_context(self, today: date | None = None) -> dict:
+        """Liest manuelle Planzuordnungen ohne Intervals- oder LLM-Abfrage."""
+        today = today or date.today()
+        plans = self.store.plans()
+        assignments = self.store.records("assignment")
+        recognition = recognize_plan(plans, [], today, assignments)
+        result = build_plan_context(plans, recognition)
+        result["recognition"] = recognition
+        result["race_goals"] = [
+            {key: race.get(key) for key in ("name", "date", "sport", "target_seconds", "performance_goal")}
+            for race in self.store.records("race") if race.get("status") == "planned"
+        ]
+        return result
 
     def summary(self, today: date | None = None) -> dict:
         today = today or date.today()
@@ -125,8 +139,8 @@ class TrainingAnalyst:
                  "from": valid[0]["date"], "to": valid[-1]["date"]} if len(valid) >= 2 else None
         return dict(date=today.isoformat(), errors=errors, races=races, next_race=next_race,
                     days_to_race=(date.fromisoformat(next_race["date"]) - today).days if next_race else None,
-                    plan=recognition,
-                    available_plans=[dict(id=p.id, name=p.name) for p in plans],
+                    plan=recognition, plan_context=build_plan_context(plans, recognition),
+                    available_plans=[dict(id=p.id, name=p.name, total_weeks=max(s.week for s in p.sessions)) for p in plans],
                     week=dict(start=monday.isoformat(), sessions=week_rows, actual_sessions=len(week_workouts),
                               planned_sessions=len(week_events), planned_duration_sec=sum(e.get("duration_sec") or 0 for e in week_events),
                               missing_duration=sum(e.get("duration_sec") is None for e in week_events),

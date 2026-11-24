@@ -708,6 +708,8 @@ class IntervalsClient:
             ctl = _nonnegative_number(row.get("ctl"))
             atl = _nonnegative_number(row.get("atl"))
             results.append(dict(date=day.isoformat(), ctl=ctl, atl=atl,
+                                weight=_nonnegative_number(row.get("weight")),
+                                vo2max=_nonnegative_number(row.get("vo2max")),
                                 hrv=_nonnegative_number(row.get("hrv")),
                                 resting_hr=_nonnegative_number(row.get("restingHR")),
                                 sleep_secs=_nonnegative_number(row.get("sleepSecs")),
@@ -906,3 +908,56 @@ class IntervalsClient:
                 f"{self.client.base_url}{url}",
             )
             raise
+
+    def get_historical_activities(self, start: date, end: date) -> list[dict]:
+        """Dated activity snapshots. Never substitute current sport settings."""
+        raw = self._get(f"/athlete/{self.athlete_id}/activities",
+                        {"oldest": start.isoformat(), "newest": end.isoformat()})
+        if not isinstance(raw, list):
+            raise ValueError("Expected activity list")
+        fields = {
+            "moving_time": "duration_sec", "distance": "distance_m",
+            "icu_training_load": "tss", "average_heartrate": "avg_hr",
+            "icu_average_watts": "avg_watts", "icu_weighted_avg_watts": "np_watts",
+            "icu_ftp": "ftp", "icu_weight": "weight", "lthr": "lthr",
+            "threshold_pace": "threshold_speed_mps", "icu_rpe": "rpe",
+            "icu_intensity": "intensity_percent",
+        }
+        rows = []
+        for item in raw:
+            if not isinstance(item, dict) or item.get("id") is None:
+                continue
+            day = str(item.get("start_date_local") or "")[:10]
+            try:
+                if not start <= date.fromisoformat(day) <= end:
+                    continue
+            except ValueError:
+                continue
+            row = dict(id=str(item["id"]), date=day, name=item.get("name") or "Untitled",
+                       sport=item.get("type") or "Unknown", source="activity",
+                       description=item.get("description") or "",
+                       device=item.get("device_name"), intervals=item.get("interval_summary") or [])
+            row.update({target: _nonnegative_number(item.get(source)) for source, target in fields.items()})
+            rows.append(row)
+        return rows
+
+    def get_historical_comments(self, activity_id: str) -> dict:
+        """Separate personal activity comments from descriptions and other authors."""
+        from urllib.parse import quote
+        raw = self._get(f"/activity/{quote(activity_id, safe='')}/messages", {"limit": 100})
+        if not isinstance(raw, list):
+            raise ValueError("Expected message list")
+        return dict(comments=[dict(id=str(r.get("id")), created=r.get("created"),
+                         text=r["content"], personal=str(r.get("athlete_id")) == str(self.athlete_id))
+                    for r in raw if isinstance(r, dict) and r.get("content") and not r.get("deleted")
+                    and r.get("type") in {"TEXT", "NOTE"}], possibly_truncated=len(raw) >= 100)
+
+    def get_historical_session_details(self, activity_id: str) -> dict:
+        """On-demand laps without loading streams, location or present-day settings."""
+        from urllib.parse import quote
+        raw = self._get(f"/activity/{quote(activity_id, safe='')}", {"intervals": "true"})
+        if not isinstance(raw, dict):
+            raise ValueError("Expected activity details")
+        return dict(description=raw.get("description") or "", device=raw.get("device_name"),
+                    trainer=raw.get("trainer"), average_temp=_nonnegative_number(raw.get("average_temp")),
+                    intervals=[s.model_dump(mode="json") for s in self._map_intervals_to_workout_splits(raw.get("icu_intervals") or [])])

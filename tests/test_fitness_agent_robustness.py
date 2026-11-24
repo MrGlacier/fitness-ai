@@ -81,3 +81,23 @@ class FitnessAgentRobustnessTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LocalPlanContextTests(unittest.IsolatedAsyncioTestCase):
+    async def test_selected_plan_is_in_planning_and_answer_even_when_other_tool_is_used(self):
+        context = dict(status="available", name="Example Build", week=6,
+                       sessions=[dict(title="Original Test Session", duration_sec=3600)])
+        llm = FakeLlmClient([
+            '{"status":"found","response_type":"data","tools":[{"tool":"hello","arguments":{}}]}',
+            'Dein zugeordneter Plan ist Example Build, Woche 6.',
+        ])
+        agent = FitnessAgent(llm, FakeMcpClient(), plan_context_provider=lambda: context)
+        answer = await agent.ask("Welchen Trainingsplan trainiere ich?")
+        assert "Woche 6" in answer
+        assert "Example Build" in llm.questions[0]
+        assert "Original Test Session" in llm.questions[1]
+
+    async def test_local_plan_can_be_answered_when_planner_finds_no_external_tool(self):
+        llm = FakeLlmClient(['{"status":"failed","response_type":"data","tools":[]}', 'Woche 6'])
+        agent = FitnessAgent(llm, FakeMcpClient(), plan_context_provider=lambda: dict(status="available", week=6))
+        assert await agent.ask("Welche Planwoche ist aktuell?") == "Woche 6"

@@ -76,27 +76,7 @@ class AnalystStore:
         original = self.originals / f"{digest}{suffix}"
         if not original.exists():
             shutil.copyfile(source, original)
-        if suffix == ".json":
-            data = json.loads(source.read_text(encoding="utf-8"))
-        elif suffix == ".xlsx":
-            rows = read_xlsx_table(source)
-            data = dict(metadata or {})
-            data["sessions"] = rows
-        elif suffix in {".csv", ".md"}:
-            text = source.read_text(encoding="utf-8-sig")
-            if suffix == ".csv":
-                rows = list(csv.DictReader(StringIO(text)))
-            else:
-                lines = [line.strip().strip("|") for line in text.splitlines() if line.strip().startswith("|")]
-                if len(lines) < 3:
-                    raise ValueError("Markdown requires an explicit session table")
-                rows = list(csv.DictReader([lines[0], *lines[2:]], delimiter="|"))
-                rows = [{k.strip(): v.strip() for k, v in row.items()} for row in rows]
-            data = dict(metadata or {})
-            data["sessions"] = [{k: v for k, v in row.items() if v not in ("", None)} for row in rows]
-        else:
-            raise ValueError("Original archived. Export a reviewed CSV/JSON table for import; PDF/legacy XLS interpretation is not automatic.")
-        plan = TrainingPlan.model_validate(data)
+        plan = read_plan(source, metadata)
         self.save_plan(plan)
         return plan
 
@@ -109,10 +89,14 @@ class AnalystStore:
 
     def save_assignment(self, assignment: PlanAssignment) -> None:
         if assignment.end_date < assignment.start_date:
-            raise ValueError("End date precedes start date")
+            raise ValueError("Das Gültigkeitsende liegt vor dem Planstart.")
+        if assignment.start_date.weekday() != 0:
+            raise ValueError("Der Start der Planwoche 1 muss ein Montag sein.")
         if assignment.plan_id not in {p.id for p in self.plans()}:
-            raise ValueError("Unknown plan")
-        self.put("assignment", assignment.start_date.isoformat(), assignment.model_dump(mode="json"))
+            raise ValueError("Der gewählte Trainingsplan ist nicht im Archiv vorhanden.")
+        from datetime import datetime, timezone
+        body = dict(assignment.model_dump(mode="json"), updated_at=datetime.now(timezone.utc).isoformat())
+        self.put("assignment", assignment.start_date.isoformat(), body)
 
     def preparation_history(self, race_id: str) -> list[dict]:
         with self.connect() as db:
@@ -156,3 +140,34 @@ def read_xlsx_table(source: Path) -> list[dict]:
         if any(set(row) - set(headers) for row in rows[1:]):
             raise ValueError("Excel data without column headers")
         return [{headers[column]: value for column, value in row.items()} for row in rows[1:]]
+
+
+def read_plan(source: Path, metadata: dict | None = None) -> TrainingPlan:
+    """Liest ein unterstütztes Format ohne Archiv- oder Datenbankänderung."""
+    suffix = source.suffix.lower()
+    if suffix == ".json":
+        data = json.loads(source.read_text(encoding="utf-8-sig"))
+        if isinstance(data, dict) and ("userTrainingPlan" in data or ("weeks" in data and "title" in data)):
+            from fitness.lorang_import import import_lorang
+            return import_lorang(data)
+        if isinstance(data, dict) and "weeks" in data and "sessions" not in data:
+            raise ValueError("Konvertierter Intervals-Plan: Bitte die ursprüngliche Lorang-JSON-Datei importieren.")
+    elif suffix == ".xlsx":
+        rows = read_xlsx_table(source)
+        data = dict(metadata or {})
+        data["sessions"] = rows
+    elif suffix in {".csv", ".md"}:
+        text = source.read_text(encoding="utf-8-sig")
+        if suffix == ".csv":
+            rows = list(csv.DictReader(StringIO(text)))
+        else:
+            lines = [line.strip().strip("|") for line in text.splitlines() if line.strip().startswith("|")]
+            if len(lines) < 3:
+                raise ValueError("Markdown requires an explicit session table")
+            rows = list(csv.DictReader([lines[0], *lines[2:]], delimiter="|"))
+            rows = [{k.strip(): v.strip() for k, v in row.items()} for row in rows]
+        data = dict(metadata or {})
+        data["sessions"] = [{k: v for k, v in row.items() if v not in ("", None)} for row in rows]
+    else:
+        raise ValueError("Original archived. Export a reviewed CSV/JSON table for import; PDF/legacy XLS interpretation is not automatic.")
+    return TrainingPlan.model_validate(data)

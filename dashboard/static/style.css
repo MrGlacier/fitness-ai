@@ -1,776 +1,1013 @@
-/* ============================================================
-   Fitness AI Dashboard — Modern Dark Mode
-   ============================================================ */
-
-/* --- Reset & Basis --- */
-*, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-/* ====== DARK MODE (Standard) ====== */
 :root {
-    --bg:            #0a0a0f;
-    --bg-elevated:   #111118;
-    --card-bg:       #141420;
-    --card-border:   #2a2a3a;
-    --text:          #e4e4ed;
-    --text-muted:    #8888a0;
-    --accent:        #6366f1;
-    --accent-hover:  #818cf8;
-    --accent-soft:   rgba(99, 102, 241, 0.08);
-    --success:       #22c55e;
-    --warning:       #f59e0b;
-    --danger:        #ef4444;
-    --input-bg:      #1a1a2e;
-    --input-border:  #3a3a4e;
-    --table-stripe:  rgba(255, 255, 255, 0.015);
-    /* TSS-Färbung */
-    --tss-blue:      #3b82f6;
-    --tss-orange:    #f59e0b;
-    --tss-red:       #ef4444;
+    color-scheme: dark;
+    --bg: #0b1220;
+    --surface: #121d2e;
+    --surface2:#172438;
+    --line: #293951;
+    --text: #eef3fc;
+    --muted: #a2b1c8;
+    --blue: #73a8ff;
+    --orange: #ffb777;
+    --green: #64dcb1;
+    --accent: #91baff;
+    --focus: #bad2ff
 }
 
-/* ====== LIGHT MODE Override ====== */
-@media (prefers-color-scheme: light) {
-    :root {
-        --bg:            #f4f4f8;
-        --bg-elevated:   #eaeaef;
-        --card-bg:       #ffffff;
-        --card-border:   #e0e0e6;
-        --text:          #1a1a2e;
-        --text-muted:    #6b6b80;
-        --accent:        #4f46e5;
-        --accent-hover:  #4338ca;
-        --accent-soft:   rgba(79, 70, 229, 0.06);
-        --success:       #16a34a;
-        --warning:       #d97706;
-        --danger:        #dc2626;
-        --input-bg:      #ffffff;
-        --input-border:  #d1d5db;
-        --table-stripe:  rgba(0, 0, 0, 0.02);
-        /* TSS-Färbung */
-        --tss-blue:      #2563eb;
-        --tss-orange:    #d97706;
-        --tss-red:       #dc2626;
-    }
+* {
+    box-sizing: border-box
 }
 
 html {
     font-size: 16px;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    scroll-padding-top: 100px
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                 "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
     background: var(--bg);
     color: var(--text);
-    line-height: 1.6;
-    min-height: 100vh;
+    font: 1rem/1.55 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif
 }
 
-/* ============================================================
-   Header
-   ============================================================ */
-header {
+button,input,select,textarea {
+    font: inherit
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none
+}
+
+a: hover {
+    text-decoration: underline
+}
+
+button,a,input,select,textarea,summary {
+    outline-offset: 4px
+}
+
+button: focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible {
+    outline: 2px solid var(--focus)
+}
+
+h1,h2,h3,p {
+    margin: 0
+}
+
+h1 {
+    font-size: clamp(1.9rem,4vw,2.65rem);
+    letter-spacing: -.045em;
+    line-height: 1.15;
+    font-weight: 700
+}
+
+h2 {
+    font-size: 1.25rem;
+    letter-spacing: -.025em;
+    line-height: 1.35
+}
+
+h3 {
+    font-size: 1.15rem;
+    line-height: 1.4
+}
+
+small {
+    font-size: .875rem
+}
+
+strong {
+    font-weight: 600
+}
+
+.muted,.helper,.placeholder {
+    color: var(--muted)
+}
+
+.helper {
+    font-size: .875rem;
+    line-height: 1.6;
+    margin-top: .6rem
+}
+
+.placeholder {
+    padding: 1.2rem 0;
+    line-height: 1.7
+}
+
+.eyebrow {
+    font-size: .875rem;
+    font-weight: 650;
+    letter-spacing: .09em;
+    color: var(--muted)
+}
+
+.site-header {
     position: sticky;
     top: 0;
     z-index: 10;
-    background: var(--card-bg);
-    border-bottom: 1px solid var(--card-border);
-    padding: 1rem 1.5rem;
+    background: #0b1220f2;
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(12px)
 }
 
 .header-content {
-    max-width: 1200px;
-    margin: 0 auto;
+    max-width: 1480px;
+    margin: auto;
+    min-height: 84px;
+    padding: 0 2rem;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 1rem;
+    justify-content: space-between;
+    gap: 2rem
 }
 
-.header-main h1 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    margin: 0;
+.brand {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
     color: var(--text);
+    font-size: 1.05rem;
+    font-weight: 650
 }
 
-.header-subtitle {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-top: 0.1rem;
+.brand:hover {
+    text-decoration: none
+}
+
+.brand small {
     display: block;
+    font-size: .75rem;
+    letter-spacing: .13em;
+    color: var(--muted);
+    margin-top: .1rem
 }
 
-/* API-Status-Indikator */
-.api-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
-.api-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--success);
-    display: inline-block;
-    flex-shrink: 0;
-}
-
-.api-disconnected .api-dot {
-    background: var(--danger);
-}
-
-/* ============================================================
-   Main Layout
-   ============================================================ */
-main {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 1.5rem 1.5rem 3rem;
+.brand-mark {
+    width: 43px;
+    height: 43px;
     display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-}
-
-/* ============================================================
-   Cards
-   ============================================================ */
-.card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
     border-radius: 12px;
-    padding: 1.25rem 1.5rem;
+    background: var(--blue);
+    color: #0b1c36;
+    font-weight: 800;
+    font-size: 1.15rem
 }
 
-.card h2 {
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
+.brand-mark span {
+    font-size: .8rem
 }
 
-/* Hervorgehobene Card (Training heute) */
-.card-highlight {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-}
-
-/* --- Training heute --- */
-.training-today-content {
+.site-header nav {
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    gap: 1.8rem
 }
 
-.form-badge {
+.site-header nav a {
+    color: var(--muted);
+    font-size: .925rem
+}
+
+.site-header nav a:hover {
+    color: var(--text)
+}
+
+.connection {
+    font-size: .875rem;
+    color: var(--muted);
+    white-space: nowrap
+}
+
+.connection:before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--orange);
+    margin-right: .5rem
+}
+
+.connection.connected:before {
+    background: var(--green)
+}
+
+main {
+    max-width: 1480px;
+    margin: auto;
+    padding: 2.5rem 2rem 4rem;
+    display: grid;
+    gap: 1.5rem
+}
+
+.page-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem
+}
+
+.page-heading .eyebrow {
+    margin-bottom: .5rem
+}
+
+.page-heading .muted {
+    margin-top: .6rem
+}
+
+.date-label {
+    font-size: .875rem;
+    color: var(--muted);
+    padding: .55rem .9rem;
+    border: 1px solid var(--line);
+    border-radius: 30px;
+    white-space: nowrap
+}
+
+.metric-strip {
+    display: grid;
+    grid-template-columns: repeat(4,minmax(0,1fr));
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 18px;
+    padding: 1.35rem 0
+}
+
+.metric {
+    padding: 0 1.6rem;
+    border-right: 1px solid var(--line);
+    display: grid;
+    gap: .4rem;
+    align-content: start
+}
+
+.metric:last-child {
+    border-right: 0
+}
+
+.metric strong {
+    font-size: 2rem;
+    letter-spacing: -.04em;
+    line-height: 1.3
+}
+
+.metric strong small {
+    font-size: .875rem;
+    color: var(--muted);
+    margin-left: .6rem;
+    letter-spacing: 0
+}
+
+.metric .muted {
+    font-size: .875rem
+}
+
+.metric-label {
+    font-size: .875rem;
+    color: var(--muted)
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: .5rem
+}
+
+.blue {
+    background: var(--blue)
+}
+
+.orange {
+    background: var(--orange)
+}
+
+.green {
+    background: var(--green)
+}
+
+.dashboard-grid {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: minmax(0,1.35fr) minmax(0,1fr)
+}
+
+.training-grid {
+    grid-template-columns: minmax(0,1.1fr) minmax(0,1fr);
+    align-items: start
+}
+
+.card {
+    min-width: 0;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 18px;
+    padding: 1.5rem
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem
+}
+
+.section-heading .eyebrow+h2 {
+    margin-top: .3rem
+}
+
+.badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 8px;
-    padding: 0.45rem 0.9rem;
-    width: fit-content;
+    border: 1px solid var(--line);
+    background: var(--surface2);
+    border-radius: 7px;
+    padding: .25rem .6rem;
+    font-size: .875rem;
+    color: var(--muted);
+    white-space: nowrap
 }
 
-.form-badge-label {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 500;
+.badge.success {
+    color: var(--green);
+    border-color: #2f5b51;
+    background: #123a302e
 }
 
-.form-badge-value {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text);
+.badge.warning,.warning {
+    color: var(--orange)
 }
 
-.form-summary {
-    font-size: 0.95rem;
-    line-height: 1.65;
-    color: var(--text);
+.plan-card {
+    border-top: 3px solid var(--blue)
 }
 
-.training-note {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    font-style: italic;
-    margin-top: 0.25rem;
+.plan-name {
+    font-size: 1.35rem;
+    max-width: 46ch
 }
 
-/* ============================================================
-   KPI Grid
-   ============================================================ */
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.85rem;
-}
-
-.kpi-card {
-    background: var(--bg-elevated);
-    border: 1px solid var(--card-border);
-    border-radius: 10px;
-    padding: 1rem 1.15rem;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-}
-
-.kpi-label {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 500;
-}
-
-.kpi-value {
-    font-size: 1.7rem;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-}
-
-.kpi-unit {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    font-weight: 500;
-    margin-top: 0.1rem;
-}
-
-/* ============================================================
-   Week Stats
-   ============================================================ */
-.week-overview {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-}
-
-.week-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.25rem;
-    font-size: 0.88rem;
-}
-
-.week-stat {
-    color: var(--text-muted);
-}
-
-.week-stat.tss {
-    font-weight: 600;
-    color: var(--text);
-}
-
-.sport-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    padding-top: 0.85rem;
-    border-top: 1px solid var(--card-border);
-}
-
-.sport-row {
+.plan-progress-heading {
     display: flex;
     justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    margin-bottom: .7rem
+}
+
+progress {
+    width: 100%;
+    height: 7px;
+    border: 0;
+    border-radius: 10px;
+    accent-color: var(--blue);
+    display: block;
+    margin-bottom: .8rem
+}
+
+progress: :-webkit-progress-bar {
+    background: var(--line);
+    border-radius: 10px
+}
+
+progress: :-webkit-progress-value {
+    background: var(--blue);
+    border-radius: 10px
+}
+
+progress: :-moz-progress-bar {
+    background: var(--blue);
+    border-radius: 10px
+}
+
+.plan-card>.muted {
+    font-size: .875rem
+}
+
+.race-hero {
+    background: linear-gradient(125deg,#182c48,var(--surface) 85%)
+}
+
+.race-hero h2 {
+    font-size: 1.55rem
+}
+
+.race-date {
+    color: var(--muted);
+    margin-top: .55rem
+}
+
+.race-targets {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem
+}
+
+.race-targets>div {
+    flex: 1
+}
+
+.race-targets strong {
+    display: block;
+    margin-top: .4rem;
+    font-size: 1.6rem;
+    letter-spacing: -.035em
+}
+
+.race-targets .index-value {
+    font-size: 1.1rem;
+    line-height: 1.5
+}
+
+.text-link {
+    display: inline-block;
+    font-size: .925rem;
+    margin-top: .7rem
+}
+
+.settings {
+    border-top: 1px solid var(--line);
+    margin-top: 1.3rem;
+    padding-top: 1rem
+}
+
+.settings>summary {
+    color: var(--accent);
+    font-weight: 550
+}
+
+.subtle-details {
+    margin-top: 1rem;
+    border-top: 1px solid var(--line);
+    padding-top: .85rem
+}
+
+.subtle-details>summary {
+    font-size: .875rem;
+    color: var(--muted)
+}
+
+summary {
+    cursor: pointer;
+    min-height: 32px
+}
+
+details[open]>summary {
+    margin-bottom: .65rem
+}
+
+.notice {
+    padding: .85rem 1rem;
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: .925rem;
+    margin: .8rem 0
+}
+
+.notice.warning {
+    border-color: #795637
+}
+
+.analyst-form {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 1rem;
+    margin-top: 1.25rem
+}
+
+.analyst-form label {
+    display: grid;
+    gap: .45rem;
+    font-size: .875rem;
+    color: var(--muted)
+}
+
+.field-wide {
+    grid-column: 1/-1
+}
+
+input,select,textarea {
+    width: 100%;
+    min-width: 0;
+    padding: .75rem .8rem;
+    border-radius: 9px;
+    border: 1px solid #3a4d69;
+    background: #0f192a;
+    color: var(--text)
+}
+
+input: :placeholder,textarea::placeholder {
+    color: #8b9db8
+}
+
+select {
+    appearance: none;
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239aacbf'%3E%3Cpath d='m2 4 4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right .8rem center
+}
+
+button,.button {
+    display: inline-flex;
     align-items: center;
-    padding: 0.4rem 0;
-    font-size: 0.85rem;
+    justify-content: center;
+    padding: .75rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: var(--blue);
+    color: #0b1c36;
+    font-weight: 650;
+    cursor: pointer;
+    font-size: .925rem;
+    min-height: 44px
 }
 
-.sport-row:not(:last-child) {
-    border-bottom: 1px solid var(--card-border);
+button: hover,.button:hover {
+    filter: brightness(1.08);
+    text-decoration: none
 }
 
-.sport-name {
-    font-weight: 500;
+button: disabled {
+    opacity: .65;
+    cursor: wait
+}
+
+.secondary {
+    background: var(--surface2);
     color: var(--text);
+    border-color: var(--line)
 }
 
-.sport-detail {
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
+output {
+    grid-column: 1/-1;
+    font-size: .925rem;
+    white-space: pre-line
 }
 
-/* ============================================================
-   Workout Table
-   ============================================================ */
+output.error {
+    color: var(--orange)
+}
+
+output.success {
+    color: var(--green)
+}
+
+.form-actions {
+    display: flex;
+    gap: .75rem;
+    flex-wrap: wrap
+}
+
+.race-form {
+    grid-template-columns: repeat(3,minmax(0,1fr))
+}
+
+.week-metrics {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: .8rem;
+    padding-bottom: 1.2rem;
+    border-bottom: 1px solid var(--line)
+}
+
+.week-metrics span {
+    display: block;
+    color: var(--muted);
+    font-size: .875rem
+}
+
+.week-metrics strong {
+    display: block;
+    font-size: 1.2rem;
+    margin-top: .4rem;
+    white-space: nowrap
+}
+
+.week-metrics small {
+    display: block;
+    color: var(--muted);
+    font-weight: 400;
+    font-size: .875rem
+}
+
+.session-row {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--line)
+}
+
+.session-row:last-child {
+    border: 0
+}
+
+.sport-mark {
+    flex: 0 0 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--surface2);
+    font-size: 1.1rem
+}
+
+.sport-mark.run {
+    background: #443624
+}
+
+.sport-mark.ride {
+    background: #213b5c
+}
+
+.sport-mark.swim {
+    background: #1a4446
+}
+
+.session-main {
+    min-width: 0;
+    flex: 1
+}
+
+.session-main strong {
+    display: block;
+    font-size: .925rem;
+    font-weight: 550;
+    overflow-wrap: anywhere
+}
+
+.session-main span {
+    display: block;
+    font-size: .875rem;
+    color: var(--muted);
+    margin-top: .25rem
+}
+
+.session-row>.badge {
+    font-size: .8rem
+}
+
+.chart-legend {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: .875rem;
+    color: var(--muted)
+}
+
+#fitness-chart {
+    width: 100%;
+    height: 280px;
+    display: block;
+    margin-top: 1rem
+}
+
+.chart-caption {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: .875rem;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: .8rem
+}
+
+.race-grid {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 1.25rem;
+    margin-top: 1.2rem
+}
+
+.race-detail {
+    border: 1px solid var(--line);
+    background: #0f192a;
+    border-radius: 12px;
+    padding: 1.25rem;
+    min-width: 0
+}
+
+.race-index {
+    font-size: 1.5rem;
+    letter-spacing: -.035em;
+    margin: .8rem 0
+}
+
+.race-detail>.muted {
+    font-size: .875rem
+}
+
+.component-list {
+    margin: 1.2rem 0
+}
+
+.component-list details {
+    border-top: 1px solid var(--line);
+    padding: .65rem 0
+}
+
+.component-list summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: .875rem
+}
+
+.component-list summary strong {
+    color: var(--muted);
+    white-space: nowrap
+}
+
+.component-list details[open] {
+    padding-bottom: 1rem
+}
+
+.component-list details p {
+    font-size: .875rem;
+    margin: .65rem 0
+}
+
+.preparation-chart {
+    width: 100%;
+    height: 180px;
+    display: block
+}
+
 .table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border-radius: 8px;
+    overflow: auto;
+    max-width: 100%;
+    margin-top: .8rem
 }
 
 .workout-table {
-    width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
-    white-space: nowrap;
-}
-
-.workout-table thead th {
+    width: 100%;
     text-align: left;
-    font-weight: 600;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-    padding: 0.7rem 0.75rem 0.55rem;
-    border-bottom: 2px solid var(--card-border);
+    font-size: .875rem
 }
 
-.workout-table tbody td {
-    padding: 0.65rem 0.75rem;
-    border-bottom: 1px solid var(--card-border);
-    vertical-align: middle;
+.workout-table th {
+    font-weight: 500;
+    color: var(--muted);
+    padding: .75rem .5rem;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap
 }
 
-.workout-table tbody tr:nth-child(even) {
-    background: var(--table-stripe);
+.workout-table td {
+    padding: .9rem .5rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top
+}
+
+.workout-table td small {
+    display: block;
+    color: var(--muted);
+    margin-top: .3rem
 }
 
 .workout-table tbody tr:last-child td {
-    border-bottom: none;
+    border-bottom: 0
 }
 
-.workout-name {
-    font-weight: 500;
-    color: var(--text);
+.tss-low {
+    color: var(--blue)
 }
 
-/* ============================================================
-   TSS-Färbung (niedrig = blau, mittel = orange, hoch = rot)
-   ============================================================ */
-.tss {
-    font-weight: 600;
+.tss-medium {
+    color: var(--orange)
 }
 
-.tss.tss-low {
-    color: var(--tss-blue);
+.tss-high {
+    color: #ff929b
 }
 
-.tss.tss-medium {
-    color: var(--tss-orange);
+.chat-card>h2 {
+    margin: .35rem 0 .65rem
 }
 
-.tss.tss-high {
-    color: var(--tss-red);
-}
-
-/* ============================================================
-   Chat
-   ============================================================ */
 .chat-form {
-    margin-bottom: 0.5rem;
+    display: grid;
+    gap: .8rem;
+    margin-top: 1.1rem
 }
 
-.chat-input-row {
-    display: flex;
-    gap: 0.5rem;
+.chat-form textarea {
+    resize: vertical;
+    min-height: 100px
 }
 
-.chat-input-row input {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--input-border);
-    border-radius: 10px;
-    background: var(--input-bg);
-    color: var(--text);
-    font-size: 0.95rem;
-    outline: none;
-    transition: border-color 0.15s ease;
-}
-
-.chat-input-row input::placeholder {
-    color: var(--text-muted);
-}
-
-.chat-input-row input:focus {
-    border-color: var(--accent);
-}
-
-.chat-input-row button {
-    padding: 0.75rem 1.5rem;
-    background: var(--accent);
-    color: #ffffff;
-    border: none;
-    border-radius: 10px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.15s ease;
-}
-
-.chat-input-row button:hover {
-    background: var(--accent-hover);
+.chat-form button {
+    justify-self: start
 }
 
 .chat-response {
-    background: var(--bg-elevated);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
-    margin-top: 0.85rem;
-}
-
-.chat-answer {
+    margin-top: 1.2rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--line);
     white-space: pre-wrap;
-    line-height: 1.65;
-    color: var(--text);
-    font-size: 0.92rem;
+    font-size: .925rem
 }
 
-/* ============================================================
-   Placeholder / Empty State
-   ============================================================ */
-.placeholder {
-    color: var(--text-muted);
-    font-style: italic;
-    font-size: 0.88rem;
-    padding: 0.5rem 0;
+.archive-session {
+    padding: .8rem 0;
+    border-top: 1px solid var(--line)
 }
 
-.placeholder a {
-    color: var(--accent);
-    text-decoration: underline;
+.archive-session p {
+    font-size: .875rem;
+    margin-top: .3rem
 }
 
-/* ============================================================
-   Loading-State (Spinner)
-   ============================================================ */
-.training-today-loading {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1.5rem 0;
-    color: var(--text-muted);
-    font-size: 0.88rem;
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0
 }
 
-.spinner {
-    width: 1.25rem;
-    height: 1.25rem;
-    border: 2px solid var(--card-border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    flex-shrink: 0;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-/* ============================================================
-   Footer
-   ============================================================ */
 footer {
-    text-align: center;
-    padding: 2rem 1rem;
-    color: var(--text-muted);
-    font-size: 0.78rem;
+    max-width: 1480px;
+    margin: auto;
+    padding: 0 2rem 2rem;
+    color: var(--muted);
+    font-size: .875rem;
+    text-align: center
 }
 
-/* ============================================================
-   Responsive
-   ============================================================ */
-@media (max-width: 640px) {
+@media(min-width:1600px) {
     main {
-        padding: 1rem 0.75rem 2rem;
+        padding-top: 3rem
     }
-
     .card {
-        padding: 1rem;
+        padding: 1.8rem
     }
+}
 
-    .kpi-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.65rem;
+@media(max-width:1100px) {
+    .site-header nav {
+        gap: 1rem
     }
-
-    .kpi-card {
-        padding: 0.85rem 0.75rem;
+    .connection {
+        display: none
     }
-
-    .kpi-value {
-        font-size: 1.4rem;
+    .training-grid,.bottom-grid {
+        grid-template-columns: 1fr
     }
-
-    .workout-table {
-        font-size: 0.8rem;
+    .race-form {
+        grid-template-columns: repeat(2,minmax(0,1fr))
     }
+}
 
-    .workout-table thead th,
-    .workout-table tbody td {
-        padding: 0.5rem 0.4rem;
-    }
-
+@media(max-width:760px) {
     .header-content {
-        flex-direction: column;
-        align-items: flex-start;
+        padding: 1rem;
+        min-height: 70px;
+        flex-wrap: wrap;
+        gap: 1rem
     }
-
-    .chat-input-row {
-        flex-direction: column;
-    }
-
-    .chat-input-row button {
+    .site-header nav {
         width: 100%;
+        justify-content: space-between;
+        gap: .4rem
     }
-
-    .week-stats {
-        flex-direction: column;
-        gap: 0.4rem;
+    .site-header nav a {
+        font-size: .875rem
     }
-
-    .sport-row {
-        font-size: 0.82rem;
+    .brand small {
+        font-size: .7rem
     }
-
-    /* Training Today Mobile */
-    .alternatives-grid {
-        grid-template-columns: 1fr !important;
+    main {
+        padding: 1.6rem 1rem 3rem;
+        gap: 1rem
     }
-
-    .primary-title {
-        font-size: 1.3rem !important;
+    .page-heading {
+        align-items: flex-start
+    }
+    .date-label {
+        display: none
+    }
+    .overview-grid,.race-grid {
+        grid-template-columns: 1fr
+    }
+    .dashboard-grid {
+        gap: 1rem
+    }
+    .card {
+        padding: 1.2rem;
+        border-radius: 13px
+    }
+    .metric-strip {
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        padding: 0
+    }
+    .metric {
+        padding: 1rem;
+        min-height: 100px
+    }
+    .metric:nth-child(2) {
+        border-right: 0
+    }
+    .metric:nth-child(-n+2) {
+        border-bottom: 1px solid var(--line)
+    }
+    .metric strong {
+        font-size: 1.7rem
+    }
+    .section-heading {
+        gap: .6rem
+    }
+    .session-row {
+        flex-wrap: wrap
+    }
+    .session-main {
+        flex-basis: calc(100% - 54px)
+    }
+    .session-row>.badge {
+        margin-left: 50px
+    }
+    .week-metrics {
+        gap: .6rem
+    }
+    .week-metrics strong {
+        font-size: 1.05rem
+    }
+    .week-metrics small {
+        font-size: .8rem
+    }
+    .analyst-form,.race-form {
+        grid-template-columns: 1fr
+    }
+    .chart-caption {
+        font-size: .8rem
+    }
+    .race-targets {
+        gap: 1rem
+    }
+    .component-list summary {
+        gap: .5rem
+    }
+    footer {
+        padding: 0 1rem 1.5rem
     }
 }
 
-/* ============================================================
-   Training Today — Hauptbereich
-   ============================================================ */
-
-.training-today-card {
-    border: 1px solid var(--accent);
-    background: linear-gradient(
-        135deg,
-        rgba(99, 102, 241, 0.06) 0%,
-        var(--card-bg) 100%
-    );
+@media(prefers-reduced-motion:reduce) {
+    html {
+        scroll-behavior: auto
+    }
 }
 
-.training-today-card h2 {
-    font-size: 1.1rem;
-    color: var(--accent);
-    margin-bottom: 1rem;
-    letter-spacing: 0.02em;
+/* Historical comparisons share the dashboard palette and form conventions. */
+.history-page {display:grid;gap:1.4rem}
+.history-page .page-heading {margin-bottom:.2rem}
+.period-grid,.history-pair-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
+.period-panel {min-width:0;border:1px solid var(--line);border-top:3px solid var(--blue);border-radius:14px;padding:1.2rem;display:grid;gap:1rem}
+.period-panel legend {font-weight:650;padding:0 .5rem}
+.period-b {border-top-color:var(--green)}
+.period-key-a {color:var(--blue)} .period-key-b {color:var(--green)}
+.date-pair {display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.history-page label {display:grid;gap:.4rem;font-size:.9rem;color:var(--muted)}
+.comparison-actions {display:flex;flex-wrap:wrap;gap:1rem;align-items:end;margin:1.2rem 0}
+.comparison-actions label {flex:1;min-width:130px}
+.comparison-actions button {min-height:46px}
+.history-page output {display:block;margin-top:1rem;overflow-wrap:anywhere}
+.history-settings {margin-top:1.3rem}
+#results {display:grid;gap:1.4rem} #results[hidden] {display:none}
+.history-kpis {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}
+.history-kpi {background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.2rem}
+.history-kpi strong {display:block;font-size:1.6rem;margin:.6rem 0;color:var(--text)}
+.history-kpi small,.history-page td small {display:block;color:var(--muted)}
+.history-page td,.history-page th {padding:.8rem;text-align:left;border-bottom:1px solid var(--line)}
+.history-page table {width:100%;border-collapse:collapse}
+.history-chart {width:100%;overflow:auto;margin-top:1rem}
+.history-chart svg {width:100%;min-width:320px;height:280px}
+.history-chart circle {cursor:pointer;outline-offset:3px}
+.history-chart circle:focus {stroke:var(--text);stroke-width:3}
+.history-page blockquote {margin:1rem 0;padding:.8rem 1rem;background:var(--surface2);border-left:3px solid var(--blue);white-space:pre-wrap;overflow-wrap:anywhere}
+.history-page details {margin-top:1rem}
+.history-page details[open]>summary {margin-bottom:1rem}
+.history-activity {padding:1rem 0;border-bottom:1px solid var(--line)}
+.history-activity .comparison-actions {margin-bottom:.4rem}
+.history-page .notice:empty {display:none}
+.history-page button:disabled {opacity:.6;cursor:wait}
+@media(max-width:800px) {.history-kpis {grid-template-columns:1fr 1fr}.period-grid,.history-pair-grid {grid-template-columns:1fr}.history-page .section-heading {align-items:start;gap:1rem;flex-wrap:wrap}}
+@media(max-width:450px) {.date-pair {grid-template-columns:1fr}.history-kpi {padding:.8rem}.history-kpi strong {font-size:1.3rem}}
+@media(max-width:760px) {
+    .site-header nav {flex-wrap:wrap;row-gap:.6rem}
+    .history-page .comparison-actions>label {min-width:0;flex-basis:100%}
 }
-
-/* --- Hauptempfehlung --- */
-.primary-recommendation {
-    background: var(--bg-elevated);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 1.25rem;
-    margin-bottom: 1rem;
-}
-
-.primary-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.primary-sport {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
-.primary-duration {
-    font-size: 0.85rem;
-    color: var(--accent);
-    font-weight: 600;
-    background: var(--accent-soft);
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-}
-
-.primary-title {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: var(--text);
-    margin: 0.5rem 0 0.75rem;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-}
-
-.primary-details {
-    font-size: 0.95rem;
-    color: var(--text);
-    line-height: 1.6;
-    margin: 0;
-}
-
-/* --- Warum heute? --- */
-.why-today {
-    background: rgba(99, 102, 241, 0.05);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 8px 8px 0;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-}
-
-.why-today h4 {
-    font-size: 0.85rem;
-    color: var(--accent);
-    margin: 0 0 0.25rem;
-    font-weight: 600;
-}
-
-.why-today p {
-    font-size: 0.9rem;
-    color: var(--text);
-    margin: 0;
-    line-height: 1.5;
-}
-
-/* --- Warnung --- */
-.training-warning {
-    background: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-    color: var(--warning);
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-/* --- Alternativen --- */
-.alternatives-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-}
-
-.alternative-card {
-    background: var(--bg-elevated);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    transition: border-color 0.15s ease, transform 0.15s ease;
-}
-
-.alternative-card:hover {
-    transform: translateY(-2px);
-}
-
-/* Kategorie-Färbung */
-.alt-swim {
-    border-color: rgba(56, 189, 248, 0.3);
-}
-.alt-swim:hover {
-    border-color: rgba(56, 189, 248, 0.6);
-}
-
-.alt-hard {
-    border-color: rgba(239, 68, 68, 0.25);
-}
-.alt-hard:hover {
-    border-color: rgba(239, 68, 68, 0.5);
-}
-
-.alt-easy {
-    border-color: rgba(34, 197, 94, 0.25);
-}
-.alt-easy:hover {
-    border-color: rgba(34, 197, 94, 0.5);
-}
-
-.alt-emoji {
-    font-size: 1.5rem;
-    line-height: 1;
-}
-
-.alt-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.alt-sport {
-    font-size: 0.85rem;
-    color: var(--text);
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    margin-top: -0.2rem;
-}
-
-.alt-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text);
-    margin: 0;
-    line-height: 1.3;
-}
-
-.alt-duration {
-    font-size: 0.8rem;
-    color: var(--accent);
-    font-weight: 600;
-}
-
-.alt-details {
-    font-size: 0.85rem;
-    color: var(--text);
-    line-height: 1.5;
-    margin: 0;
-}
-
-.alt-unavailable {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    font-style: italic;
-    margin: 0;
-    line-height: 1.4;
-}
-
-.alternative-card.unavailable {
-    opacity: 0.5;
-    filter: grayscale(0.5);
-}
-
-#fitness-chart { width: 100%; height: 280px; }
-.analyst-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; }
-.analyst-form label { display: flex; flex-direction: column; gap: .4rem; font-size: 1rem; }
-.analyst-form input, .analyst-form select, .analyst-form button { font: inherit; padding: .65rem; border: 1px solid #64748b; border-radius: .4rem; }
-.analyst-form output { grid-column: 1 / -1; }
-progress { width: 100%; }
-article { border-bottom: 1px solid #64748b; padding-block: 1rem; }
-canvas { display: block; }
-
-.preparation-chart { width: 100%; height: 180px; }

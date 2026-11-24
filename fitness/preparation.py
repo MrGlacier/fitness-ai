@@ -4,7 +4,7 @@ from statistics import median
 
 from fitness.plan_analysis import sport_family, workout_date
 
-MODEL_VERSION = "preparation-v1"
+MODEL_VERSION = "preparation-v1.2"
 NOTICE = "Vorbereitungsindex, keine Zielerreichungswahrscheinlichkeit. Nicht wissenschaftlich validiert."
 
 
@@ -101,6 +101,29 @@ def endurance(sports: list[str], workouts: list, plan, active: dict | None, days
     weeks_back = 7 if taper or days <= 21 else 2
     sessions = [s for s in plan.sessions if max(1, active["week"]-weeks_back) <= s.week <= active["week"]]
     for sport in sports:
+        swim_references = [s for s in sessions if sport_family(s.sport) == sport] if sport == "Swim" else []
+        # Distanzvorgaben benötigen keine erfundene Schwimmdauer. Zeitpläne bleiben unterstützt.
+        if swim_references and any(s.distance_km and s.duration_sec is None for s in swim_references):
+            prescribed = [s for s in swim_references if s.distance_km and s.distance_km > 0 and not s.uncertainty]
+            actual = [w for w in workouts if sport_family(w.sport) == sport and 0 <= (today-workout_date(w)).days < 28]
+            if len(prescribed) != len(swim_references):
+                missing.append("Swim: unvollständige oder unsichere Distanzreferenzen im Plan.")
+            known = [w for w in actual if w.distance_km > 0]
+            if len(prescribed) < 3 or len(known) < 3:
+                missing.append("Swim: mindestens drei Plan- und Ist-Distanzen für den Ausdauervergleich fehlen.")
+                continue
+            if len(known) != len(actual):
+                missing.append("Swim: bei absolvierten Einheiten fehlt die Distanz; der Wochenumfang bleibt unvollständig.")
+            checks.append(check("Swim: wiederholte lange Distanzen",
+                                median(sorted((w.distance_km for w in known), reverse=True)[:3]),
+                                median(sorted((s.distance_km for s in prescribed), reverse=True)[:3]), "km"))
+            monday = today-timedelta(days=today.weekday())
+            totals = [sum(w.distance_km for w in known if monday-timedelta(weeks=i) <= workout_date(w) < monday-timedelta(weeks=i-1))
+                      for i in range(1, 4)]
+            reference_totals = [sum(s.distance_km for s in prescribed if s.week == week)
+                                for week in sorted({s.week for s in prescribed})]
+            checks.append(check("Swim: typischer Wochenumfang", median(totals), median(reference_totals), "km/Woche"))
+            continue
         if any(sport_family(s.sport) == sport and (s.duration_sec is None or s.uncertainty) for s in sessions):
             missing.append(f"{sport}: unvollständige oder unsichere Ausdauerreferenzen im Plan.")
         prescribed = [s for s in sessions if sport_family(s.sport) == sport and s.duration_sec and not s.uncertainty]
@@ -162,12 +185,18 @@ def load_tolerance(workouts: list, wellness: list[dict], today: date) -> dict:
 
 def goal_alignment(race: dict, sports: list[str], workouts: list, today: date) -> dict:
     if not race.get("target_seconds"):
-        return dict(label="Bezug zum Wettkampfziel", score=None, status="not_applicable", checks=[], missing=[])
+        return dict(label="Bezug zum Wettkampfziel", score=None, status="not_applicable", checks=[], missing=[],
+                    reason="Kein Zeitziel hinterlegt. Bewertet wird die Vorbereitung auf den Wettkampf, ohne Zeitvorgabe.")
     splits = race.get("goal_splits_seconds", {})
     triathlon = "tri" in race.get("sport", "").casefold()
     if not triathlon and len(sports) == 1:
         splits = {sports[0]: race["target_seconds"]}
     checks, missing = [], []
+    if triathlon and not splits:
+        return dict(label="Bezug zum Wettkampfziel", score=None, status="target_recorded", checks=[], missing=[],
+                    target_seconds=race["target_seconds"],
+                    reason="Gesamtziel hinterlegt. Einzelzeiten und Wechselziele sind freiwillig und werden nicht verlangt.",
+                    limitation="Für eine belastbare Bewertung der Gesamtzielzeit fehlen derzeit geeignete Gesamtrennnachweise. Das blockiert den allgemeinen Vorbereitungsindex nicht.")
     if triathlon and (set(splits) != set(sports) or race.get("transition_seconds") is None
                      or sum(splits.values()) + race["transition_seconds"] > race["target_seconds"]):
         missing.append("Zum Gesamtziel passende Disziplin-Zielzeiten und explizite Wechselzeit fehlen.")
@@ -198,7 +227,8 @@ def preparation_index(race: dict, workouts: list, comparison: dict, wellness: li
                       endurance=endurance(sports, workouts, plan, active, days, today),
                       tolerance=load_tolerance(workouts, wellness, today),
                       goal=goal_alignment(race, sports, workouts, today))
-    required = [c for c in components.values() if c.get("status") != "not_applicable"]
+    # Unbekannter Zielbezug ist weder schlechte Vorbereitung noch eine Pflicht zur Eingabe von Einzelzielen.
+    required = [c for key, c in components.items() if key != "goal" or c["score"] is not None]
     missing = [f"{c['label']}: {reason}" for c in required for reason in c["missing"]]
     missing.extend(f"Datenquelle nicht verfügbar: {error}" for error in errors)
     if days < 0 or race.get("status") != "planned":
@@ -209,8 +239,8 @@ def preparation_index(race: dict, workouts: list, comparison: dict, wellness: li
                 status="available" if score is not None else "insufficient_data",
                 label=f"{score} %" if score is not None else "Datenlage unzureichend",
                 notice=NOTICE, components=components, missing=missing,
-                data_quality="belegt, methodisch begrenzt" if score is not None else "unvollständig",
+                data_quality=("Vorbereitung belegt; Zielvergleich offen" if race.get("target_seconds") and components["goal"]["score"] is None else "belegt, methodisch begrenzt") if score is not None else "unvollständig",
                 positive_factors=[c["label"] for c in required if c["score"] is not None and c["score"] == 100],
                 negative_factors=[dict(label=c["label"], score=c["score"]) for c in sorted(required, key=lambda c: c["score"] if c["score"] is not None else 101) if c["score"] is not None and c["score"] < 100],
                 phase=active["phases"] if active else [], days_to_race=days,
-                method="Engpassmodell: Minimum der belegten Teilbewertungen, keine Prozentgewichtungen. Verhältniswerte auf 0–100 begrenzt, Anzeige ganzzahlig. 100 heißt Kriterien erfüllt, nicht sieg- oder zielzeitsicher.")
+                method="Engpassmodell: Minimum der vier Kernbereiche und eines belegbaren optionalen Zielvergleichs, keine Prozentgewichtungen. Verhältniswerte auf 0–100 begrenzt, Anzeige ganzzahlig. 100 heißt Kriterien erfüllt, nicht sieg- oder zielzeitsicher.")

@@ -282,3 +282,46 @@ def test_forecast_is_bounded_by_fetched_calendar(tmp_path):
     assert len(forecast["points"]) == 365
     assert forecast["coverage_note"]
     assert forecast["points"][-1]["date"] == forecast["calendar_end"]
+
+
+def test_latest_saved_assignment_wins_and_context_contains_week(tmp_path):
+    store = AnalystStore(tmp_path)
+    first = plan()
+    second = first.model_copy(update={"id": "second", "name": "Second Plan"})
+    store.save_plan(first)
+    store.save_plan(second)
+    store.save_assignment(PlanAssignment(plan_id=first.id, start_date="2026-11-09", end_date="2026-11-30"))
+    store.save_assignment(PlanAssignment(plan_id=second.id, start_date="2026-11-16", end_date="2026-11-30"))
+    context = TrainingAnalyst(None, store).local_plan_context(TODAY)
+    assert context["plan_id"] == "second" and context["week"] == 1
+    assert context["sessions"][0]["title"] == second.sessions[0].title
+    assert "source_details" not in context["sessions"][0]
+    assert context["recognition"]["selected_assignment"]["plan_id"] == "second"
+    assert len(store.records("assignment")) == 2  # Ältere Zuordnungen bleiben erhalten.
+
+
+def test_assignment_reasons_are_actionable():
+    p = plan()
+    future = dict(plan_id=p.id, start_date="2026-11-23", end_date="2026-12-30")
+    result = recognize_plan([p], [], TODAY, [future])
+    assert "Zukunft" in result["message"] and result["selected_assignment"] == future
+    old = dict(future, start_date="2026-11-02", end_date="2026-11-08")
+    assert "abgelaufen" in recognize_plan([p], [], TODAY, [old])["message"]
+    invalid = dict(future, start_date="2026-11-02")
+    assert "außerhalb" in recognize_plan([p], [], TODAY, [invalid])["message"]
+
+
+def test_assignment_requires_monday(tmp_path):
+    store = AnalystStore(tmp_path)
+    store.save_plan(plan())
+    with pytest.raises(ValueError, match="Montag"):
+        store.save_assignment(PlanAssignment(plan_id="test", start_date="2026-11-17", end_date="2026-11-30"))
+
+
+def test_local_chat_context_keeps_total_goal_and_goal_free_race(tmp_path):
+    store = AnalystStore(tmp_path)
+    store.save_race(Race(name="Example Triathlon", date="2027-04-10", target_seconds=18000))
+    store.save_race(Race(name="Example Trail", date="2027-05-10", sport="TrailRun"))
+    context = TrainingAnalyst(None, store).local_plan_context(TODAY)
+    targets = {race["name"]: race["target_seconds"] for race in context["race_goals"]}
+    assert targets == {"Example Triathlon": 18000, "Example Trail": None}

@@ -1,159 +1,40 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fitness AI · Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitness AI · Trainingsübersicht</title>
+  <link rel="stylesheet" href="/static/style.css?v=analyst-2">
 </head>
 <body>
-    <header>
-        <div class="header-content">
-            <div class="header-main">
-                <h1>Fitness AI</h1>
-                <span class="header-subtitle">Training & Wettkampf · Analyse</span>
-            </div>
-            {% if training_status or week_stats or last_workouts %}
-                <span class="api-status" title="API verbunden">
-                    <span class="api-dot"></span>
-                    Verbunden
-                </span>
-            {% else %}
-                <span class="api-status api-disconnected" title="API nicht erreichbar">
-                    <span class="api-dot api-dot-error"></span>
-                    Getrennt
-                </span>
-            {% endif %}
-        </div>
-    </header>
-
-    <main>
-        {% include 'analyst.html' %}
-
-        <!-- Aktuelle Fitnesswerte -->
-        <section class="card">
-            <h2>Aktuelle Fitnesswerte</h2>
-            {% if training_status %}
-                <div class="kpi-grid">
-                    <div class="kpi-card">
-                        <span class="kpi-label">Fitness</span>
-                        <span class="kpi-value">{{ training_status.get('ctl')|default('?') }}</span>
-                        <span class="kpi-unit">CTL</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Fatigue</span>
-                        <span class="kpi-value">{{ training_status.get('atl')|default('?') }}</span>
-                        <span class="kpi-unit">ATL</span>
-                    </div>
-                    <div class="kpi-card">
-                        <span class="kpi-label">Form</span>
-                        <span class="kpi-value">{{ training_status.get('form')|default('?') }}</span>
-                    </div>
-                    {% if training_status.get('resting_hr') %}
-                    <div class="kpi-card">
-                        <span class="kpi-label">Ruhepuls</span>
-                        <span class="kpi-value">{{ training_status.resting_hr }}</span>
-                        <span class="kpi-unit">bpm</span>
-                    </div>
-                    {% endif %}
-                    {% if training_status.get('hrv') %}
-                    <div class="kpi-card">
-                        <span class="kpi-label">HRV</span>
-                        <span class="kpi-value">{{ training_status.hrv|default('?') }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-            {% else %}
-                <p class="placeholder">Keine Fitnesswerte verfugbar.</p>
-            {% endif %}
-        </section>
-
-        <!-- Letzte 7 Tage -->
-        <section class="card">
-            <h2>Letzte 7 Tage</h2>
-            {% if week_stats %}
-                <div class="week-overview">
-                    <div class="week-stats">
-                        <span class="week-stat">{{ week_stats.get('total_sessions', 0) }} Einheiten</span>
-                        <span class="week-stat">{{ week_stats.get('total_duration', '—')|format_duration_short }}</span>
-                        <span class="week-stat tss">TSS: {{ week_stats.get('total_tss', 0) }}</span>
-                    </div>
-                    {% if week_stats.get('by_sport') %}
-                    <div class="sport-list">
-                        {% for sport, data in week_stats.by_sport.items() %}
-                        <div class="sport-row">
-                            <span class="sport-name">{{ sport }}</span>
-                            <span class="sport-detail">{{ data.count }}x · {{ data.duration_sec|format_duration_short }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-            {% else %}
-                <p class="placeholder">Keine Daten fur die letzten 7 Tage verfugbar.</p>
-            {% endif %}
-        </section>
-
-        <!-- Letzte Aktivitaten -->
-        <section class="card">
-            <h2>Letzte Aktivitaten</h2>
-            {% if last_workouts %}
-                <div class="table-wrapper">
-                    <table class="workout-table">
-                        <thead>
-                            <tr>
-                                <th>Datum</th>
-                                <th>Name</th>
-                                <th>Sportart</th>
-                                <th>Distanz</th>
-                                <th>Dauer</th>
-                                <th>TSS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for w in last_workouts %}
-                            <tr>
-                                <td>{{ w.get('date', '?') }}</td>
-                                <td class="workout-name">{{ w.get('name', '?') }}</td>
-                                <td>{{ w.get('sport', '?') }}</td>
-                                <td>{{ w.get('distance_km')|default('?') }} km</td>
-                                <td>{{ w.get('duration_sec')|default(0)|format_duration }}</td>
-                                <td class="tss {{ w.get('tss')|tss_color_class }}">{{ w.get('tss')|default('?') }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <p class="placeholder">Keine Aktivitaten verfugbar.</p>
-            {% endif %}
-        </section>
-
-        <!-- Chat -->
-        <section class="card">
-            <h2>Frag deine Fitness-AI</h2>
-            <form method="post" action="/dashboard/chat" class="chat-form">
-                <div class="chat-input-row">
-                    <input
-                        type="text"
-                        name="question"
-                        placeholder="z.B. Wie war mein letzter Lauf?"
-                        autofocus
-                    >
-                    <button type="submit">Senden</button>
-                </div>
-            </form>
-            {% if chat_answer is not none %}
-            <div class="chat-response">
-                <div class="chat-answer">{{ chat_answer }}</div>
-            </div>
-            {% endif %}
-        </section>
-    </main>
-
-    <footer>
-        <p>Fitness AI · Trainings- und Wettkampfanalyst</p>
-    </footer>
-    <script src="/static/dashboard.js"></script>
+  <header class="site-header"><div class="header-content">
+    <a class="brand" href="/" aria-label="Fitness AI Startseite"><span class="brand-mark">F<span>AI</span></span><span>Fitness AI<small>TRAINING ANALYTICS</small></span></a>
+    <nav aria-label="Dashboard"><a href="#overview">Übersicht</a><a href="#training-week">Trainingswoche</a><a href="#races">Wettkämpfe</a><a href="/comparison">Trainingsvergleich</a><a href="#analysis">KI-Analyse</a></nav>
+    <span class="connection {{ 'connected' if analyst.get('date') or training_status else '' }}">{{ 'Daten verbunden' if analyst.get('date') or training_status else 'Daten nicht verfügbar' }}</span>
+  </div></header>
+  <main id="overview">
+    <div class="page-heading"><div><p class="eyebrow">DEINE TRAININGSÜBERSICHT</p><h1>Training & Wettkampf</h1><p class="muted">Dein Plan. Deine Entwicklung. Deine Vorbereitung.</p></div><span class="date-label">Stand {{ analyst.get('date', '—') }}</span></div>
+    {% if analyst.get('errors') %}<div class="notice warning" role="status">Einige Daten sind gerade nicht verfügbar: {{ analyst.errors|join(', ') }}. Vorhandene Informationen bleiben sichtbar.</div>{% endif %}
+    {% set status = training_status or {} %}
+    <section class="metric-strip" aria-label="Aktuelle Fitnesswerte">
+      {% for label, key, unit, tone in [('Fitness', 'ctl', 'CTL', 'blue'), ('Ermüdung', 'atl', 'ATL', 'orange'), ('Form', 'form', 'TSB', 'green')] %}
+      <div class="metric"><span class="metric-label"><i class="legend-dot {{ tone }}"></i>{{ label }}</span><strong>{{ status.get(key) if status.get(key) is not none else '—' }}<small>{{ unit }}</small></strong></div>
+      {% endfor %}
+      <div class="metric"><span class="metric-label">Letzte 7 Tage</span><strong>{{ week_stats.get('total_duration', '—')|format_duration_short }}</strong><span class="muted">{{ week_stats.get('total_sessions', '—') }} Einheiten · {% if week_stats.get('total_tss') is not none %}<span class="week-stat tss">TSS: {{ week_stats.total_tss }}</span>{% else %}TSS unbekannt{% endif %}</span></div>
+    </section>
+    {% include 'analyst.html' %}
+    <div class="dashboard-grid bottom-grid">
+      <section class="card" id="activities"><div class="section-heading"><div><p class="eyebrow">ABSOLVIERT</p><h2>Letzte Aktivitäten</h2></div><span class="muted">Letzte 5 Einheiten</span></div>
+        {% if last_workouts %}<div class="table-wrapper"><table class="workout-table"><thead><tr><th>Einheit</th><th>Dauer</th><th>Distanz</th><th>TSS</th></tr></thead><tbody>
+        {% for w in last_workouts %}<tr><td><strong>{{ w.get('name', '—') }}</strong><small>{{ w.get('date', '—') }} · {{ w.get('sport', '—') }}</small></td><td>{{ w.get('duration_sec')|format_duration }}</td><td>{{ w.get('distance_km') if w.get('distance_km') is not none else '—' }} km</td><td class="tss {{ w.get('tss')|tss_color_class }}">{{ w.get('tss') if w.get('tss') is not none else '—' }}</td></tr>{% endfor %}
+        </tbody></table></div>{% else %}<p class="placeholder">Noch keine Aktivitäten verfügbar.</p>{% endif %}
+      </section>
+      <section class="card chat-card" id="analysis"><p class="eyebrow">DEIN ANALYST</p><h2>Frag deine Fitness-AI</h2><p class="muted">Fragen zu deinem Plan, deiner Entwicklung und deiner Wettkampfvorbereitung.</p>
+        <form method="post" action="/dashboard/chat" class="chat-form"><label class="sr-only" for="chat-question">Deine Frage</label><textarea id="chat-question" name="question" rows="3" placeholder="Was steht in meiner aktuellen Planwoche an?" required></textarea><button type="submit">Analyse anfragen</button></form>
+        {% if chat_answer is not none %}<div class="chat-response" role="status">{{ chat_answer }}</div>{% endif %}
+      </section>
+    </div>
+  </main>
+  <footer>Fitness AI · Analyse auf Basis deines Plans und deiner Trainingsdaten.</footer>
+  <script src="/static/dashboard.js?v=analyst-2"></script>
 </body>
 </html>

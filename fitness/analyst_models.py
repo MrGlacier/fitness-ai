@@ -23,6 +23,7 @@ class PlanSession(AnalystModel):
     tss: float | None = Field(default=None, ge=0)
     notes: str = ""
     uncertainty: str | None = None
+    source_details: dict = Field(default_factory=dict)
 
 
 class TrainingPlan(AnalystModel):
@@ -31,6 +32,9 @@ class TrainingPlan(AnalystModel):
     sport: str
     start_date: date | None = None
     aliases: list[str] = Field(default_factory=list)
+    description: str = ""
+    source_format: str | None = None
+    source_plan_id: str | None = None
     sessions: list[PlanSession] = Field(min_length=1)
 
 

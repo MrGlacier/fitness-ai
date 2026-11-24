@@ -490,3 +490,31 @@ def test_dashboard_shows_index_and_no_time_estimate():
     assert "keine Zielerreichungswahrscheinlichkeit" in html
     assert "Aktuelle Schätzung" not in html and "Gesamtprognose" not in html
     assert "Indexverlauf über die Wochen" in html
+
+
+def test_dashboard_prefills_saved_assignment_and_uses_native_form():
+    from tests.test_analyst import plan, TODAY
+    from fitness.plan_analysis import recognize_plan
+    saved = dict(plan_id="test", start_date="2026-11-16", end_date="2026-11-22")
+    recognition = recognize_plan([plan()], [], TODAY, [saved])
+    data = dict(date=TODAY.isoformat(), plan=recognition, available_plans=[dict(id="test", name="Example")])
+    with patch.object(routes, "_safe_summary", return_value={}), patch.object(routes, "_safe_analyst", return_value=data):
+        html = routes.dashboard_index(DashboardRouteTests._request()).body.decode()
+    assert 'value="test" selected' in html
+    assert 'value="2026-11-16"' in html and 'value="2026-11-22"' in html
+    assert 'method="post" action="/dashboard/assignment"' in html
+    assert "Manuell zugeordnet" in html and "Planzuordnung bearbeiten" in html
+
+
+def test_native_assignment_save_redirects_and_keeps_validation_errors():
+    with patch.object(routes, "save_assignment", return_value={}) as save:
+        response = routes.save_assignment_form("test", "2026-11-16", "2026-11-22")
+        assert response.status_code == 303
+        assert response.headers["location"] == "/?assignment=saved#plan"
+        save.assert_called_once_with(dict(plan_id="test", start_date="2026-11-16", end_date="2026-11-22"))
+    from fastapi import HTTPException
+    with patch.object(routes._api_client, "put", return_value=httpx.Response(422, json={"detail": "Start muss Montag sein"})):
+        with unittest.TestCase().assertRaises(HTTPException) as error:
+            routes.save_assignment({})
+        assert error.exception.status_code == 422
+        assert error.exception.detail == "Start muss Montag sein"

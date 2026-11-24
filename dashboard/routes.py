@@ -4,7 +4,7 @@ import httpx
 from typing import Annotated
 
 from fastapi import Form, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from dashboard.app import app, FITNESS_API_URL, templates
 
@@ -214,6 +214,8 @@ def _safe_analyst() -> dict:
 def save_race(payload: dict):
     try:
         response = _api_client.put("/analyst/races", json=payload)
+        if response.status_code == 422:
+            raise HTTPException(422, response.json().get("detail", "Bitte Eingaben prüfen."))
         response.raise_for_status()
         return response.json()
     except httpx.HTTPError as exc:
@@ -224,7 +226,90 @@ def save_race(payload: dict):
 def save_assignment(payload: dict):
     try:
         response = _api_client.put("/analyst/assignment", json=payload)
+        if response.status_code == 422:
+            raise HTTPException(422, response.json().get("detail", "Bitte Eingaben prüfen."))
         response.raise_for_status()
         return response.json()
     except httpx.HTTPError as exc:
         raise HTTPException(502, "Planzuordnung konnte nicht gespeichert werden.") from exc
+
+
+def _session_status(value: str) -> str:
+    return {"completed": "Absolviert", "moved": "Verschoben", "planned": "Geplant",
+            "uncertain": "Zuordnung prüfen", "unmatched": "Nicht zugeordnet"}.get(value, value)
+
+
+templates.env.filters["session_status"] = _session_status
+templates.env.filters["weekday_name"] = lambda value: {1: "Mo", 2: "Di", 3: "Mi", 4: "Do", 5: "Fr", 6: "Sa", 7: "So"}.get(value, "—")
+
+
+@app.post("/dashboard/assignment")
+def save_assignment_form(
+    plan_id: Annotated[str, Form()],
+    start_date: Annotated[str, Form()],
+    end_date: Annotated[str, Form()],
+):
+    """Speichert auch bei blockiertem JavaScript über das normale HTML-Formular."""
+    save_assignment(dict(plan_id=plan_id, start_date=start_date, end_date=end_date))
+    return RedirectResponse("/?assignment=saved#plan", status_code=303)
+
+
+@app.get("/comparison", response_class=HTMLResponse)
+def comparison_page(request: Request):
+    return HTMLResponse(templates.get_template("comparison.html").render(request=request))
+
+
+def _history_proxy(method: str, path: str, **kwargs):
+    try:
+        response = _api_client.request(method, f"/analyst/history/{path}", **kwargs)
+        if response.status_code == 422:
+            raise HTTPException(422, response.json().get("detail", "Eingaben prüfen."))
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, "Historische Daten derzeit nicht erreichbar. Bitte später erneut versuchen.") from exc
+
+
+@app.get("/dashboard/history/catalog")
+def history_catalog_proxy():
+    return _history_proxy("GET", "catalog")
+
+
+@app.post("/dashboard/history/compare")
+def history_compare_proxy(payload: dict):
+    return _history_proxy("POST", "compare", json=payload, timeout=120)
+
+
+@app.put("/dashboard/history/preparation")
+def history_preparation_proxy(payload: dict):
+    return _history_proxy("PUT", "preparation", json=payload)
+
+
+@app.put("/dashboard/history/assignment")
+def history_assignment_proxy(payload: dict):
+    return _history_proxy("PUT", "assignment", json=payload)
+
+
+@app.get("/dashboard/history/pair")
+def history_pair_proxy(a_id: str, b_id: str):
+    return _history_proxy("GET", "pair", params=dict(a_id=a_id, b_id=b_id), timeout=120)
+
+
+@app.post("/dashboard/history/explain")
+def history_explain(payload: dict):
+    from pydantic import BaseModel, Field, ValidationError
+
+    class PairRequest(BaseModel):
+        a_id: str = Field(pattern=r"^[\w-]{1,100}$")
+        b_id: str = Field(pattern=r"^[\w-]{1,100}$")
+
+    try:
+        pair = PairRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(422, "Zwei gültige Aktivitäts-IDs sind erforderlich.") from exc
+    return {"answer": _safe_chat(
+        f"Vergleiche activity:{pair.a_id} (A) mit activity:{pair.b_id} (B). "
+        "Lade get_historical_session_pair mit diesen IDs. Werte persönliche Originalkommentare semantisch aus, "
+        "beachte Negationen und gleiche sie mit RPE und Messwerten ab. Zitiere relevante Aussagen mit Datum und Referenz. "
+        "Benenne Widersprüche. Trenne messbaren Unterschied, plausible Interpretation und unbelegte Vermutung. "
+        "Keine Entwicklung behaupten, wenn Vergleichbarkeit oder Belege fehlen.")}

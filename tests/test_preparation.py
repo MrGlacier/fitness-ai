@@ -133,16 +133,20 @@ def test_goal_uses_demonstrated_speed_not_predicted_time():
     # Prior races still qualify; once no race evidence remains, don't invent it.
     for w in data["workouts"]:
         w.is_race = False
-    assert preparation_index(**data)["components"]["goal"]["score"] is None
+    result = preparation_index(**data)
+    assert result["components"]["goal"]["score"] is None
+    assert result["score"] == 100  # Fehlende optionale Rennnachweise blockieren die belegten Kernbereiche nicht.
 
 
-def test_triathlon_requires_evidence_in_every_discipline_and_goal_splits():
+def test_triathlon_requires_discipline_evidence_but_not_split_targets():
     data = evidence(target=10000)
     data["race"].update(sport="Triathlon", distances_km={"Swim": 1.9, "Ride": 90, "Run": 21.1})
     index = preparation_index(**data)
     assert index["score"] is None
     assert any("Swim" in m for m in index["components"]["performance"]["missing"])
     assert index["components"]["goal"]["score"] is None
+    assert index["components"]["goal"]["status"] == "target_recorded"
+    assert index["components"]["goal"]["missing"] == []
 
 
 def test_ctl_alone_has_no_effect():
@@ -212,7 +216,15 @@ def test_complete_triathlon_and_goal_budget():
     assert index["score"] == 100
     data["race"]["target_seconds"] = 3000
     index = preparation_index(**data)
-    assert index["score"] is None and index["components"]["goal"]["score"] is None
+    assert index["score"] == 100 and index["components"]["goal"]["score"] is None
+    assert index["components"]["goal"]["missing"]
+    # Ein Gesamtziel ohne weitere Eingaben ist ebenfalls vollständig speicherbar und nicht blockierend.
+    data["race"].update(goal_splits_seconds={}, transition_seconds=None, distances_km={})
+    index = preparation_index(**data)
+    assert index["score"] == 100
+    assert index["components"]["goal"]["status"] == "target_recorded"
+    assert index["missing"] == []
+    assert index["data_quality"] == "Vorbereitung belegt; Zielvergleich offen"
 
 
 def test_negative_values_cannot_escape_index_bounds():
@@ -235,3 +247,36 @@ def test_missing_distances_do_not_count_as_bad_endurance():
     part = endurance(["Run"], data["workouts"], data["plan"], data["active"], 70, TODAY)
     assert part["score"] is None
     assert any("Ist-Distanzen" in reason for reason in part["missing"])
+
+
+def test_distance_only_swim_plan_is_valid_endurance_evidence():
+    data = evidence()
+    swim_plan = data['plan'].model_copy(update={'sessions': [
+        s.model_copy(update={'sport': 'Swim', 'duration_sec': None, 'distance_km': 2.5})
+        for s in data['plan'].sessions]})
+    swims = [w.model_copy(update={'sport': 'Swim', 'distance_km': 2.5}) for w in data['workouts']]
+    part = endurance(['Swim'], swims, swim_plan, data['active'], 70, TODAY)
+    assert part['score'] == 100 and part['missing'] == []
+    assert {c['unit'] for c in part['checks']} == {'km', 'km/Woche'}
+    assert all(s.duration_sec is None for s in swim_plan.sessions)
+
+
+def test_distance_only_swim_plan_does_not_turn_missing_distance_into_zero_score():
+    data = evidence()
+    swim_plan = data['plan'].model_copy(update={'sessions': [
+        s.model_copy(update={'sport': 'Swim', 'duration_sec': None, 'distance_km': 2.5})
+        for s in data['plan'].sessions]})
+    swims = [w.model_copy(update={'sport': 'Swim', 'distance_km': 0}) for w in data['workouts']]
+    part = endurance(['Swim'], swims, swim_plan, data['active'], 70, TODAY)
+    assert part['score'] is None
+    assert any('Ist-Distanzen' in reason for reason in part['missing'])
+
+
+def test_distance_only_swim_load_is_measured_against_plan():
+    data = evidence()
+    swim_plan = data['plan'].model_copy(update={'sessions': [
+        s.model_copy(update={'sport': 'Swim', 'duration_sec': None, 'distance_km': 2.5})
+        for s in data['plan'].sessions]})
+    swims = [w.model_copy(update={'sport': 'Swim', 'distance_km': 1.25}) for w in data['workouts']]
+    part = endurance(['Swim'], swims, swim_plan, data['active'], 70, TODAY)
+    assert part['score'] == 50

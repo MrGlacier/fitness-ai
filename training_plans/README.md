@@ -16,6 +16,65 @@ uv run python -m fitness.import_plan /pfad/plan.csv --metadata /pfad/metadata.js
 uv run python -m fitness.import_plan /pfad/plan.xlsx --metadata /pfad/metadata.json
 ```
 
+## Dan-Lorang-Originaldateien direkt importieren
+
+Der Importer erkennt TrainingCulture/Lorang-JSON automatisch: sowohl direkte
+Pläne mit `weeks` als auch Exporte mit `userTrainingPlan`. Grundlage sind die
+Feldzuordnung und Einheiten des vorhandenen `lorang-intervals-converter`;
+Fitness AI benötigt dessen Installation oder Intervals-Zugang dafür nicht.
+Die bereits für Intervals konvertierten `*_converted_for_intervals.json` sind
+kein Eingabeformat; bitte immer die Originaldateien verwenden.
+
+Aus dem Fitness-AI-Projektverzeichnis zunächst ohne Schreibzugriffe prüfen:
+
+```bash
+uv run python -m fitness.import_plan "../lorang-intervals-converter/Trainingspläne" --pattern 'TC*.json' --dry-run
+```
+
+Danach den gesamten Ordner importieren:
+
+```bash
+uv run python -m fitness.import_plan "../lorang-intervals-converter/Trainingspläne" --pattern 'TC*.json'
+```
+
+Eine einzelne Datei funktioniert genauso:
+
+```bash
+uv run python -m fitness.import_plan "/pfad/TC Example Build.json"
+```
+
+Vorheriges Kopieren ist unnötig. Der Import legt das unveränderte Original in
+`originals/` und den lesbaren Archivplan in `structured/` ab. Die CLI liest die
+Projekt-`.env`, insbesondere `FITNESS_DATA_DIR`; explizite Umgebungsvariablen
+haben Vorrang. Ein Ordnerimport läuft nicht rekursiv, verarbeitet alle Treffer
+und liefert bei Fehlern einen Exitcode ungleich 0. Er zeigt pro Datei die
+Plan-ID, Wochen, Einheiten und Anzahl unklarer Zuordnungen.
+
+Die Plan-ID ist inhaltsbasiert: identische Planinhalte werden wiedererkannt,
+abweichende Versionen mit derselben ursprünglichen Lorang-ID bleiben getrennt.
+Der Import liest Originalwochen statt `sampleWeeks`. Er übernimmt Tagesreihenfolge,
+Namen, Beschreibungen, Dauer in Sekunden und Distanzen mit expliziter Einheit.
+Wochen-/Tageshinweise, Ernährung mit Originaleinheiten, Kraftvorgaben und
+Intervallstrukturen bleiben erhalten. Zusätzliche Quellstrukturen liegen pro
+Einheit in `source_details`, Planabsicht in `description`. Persönliche
+Autoren-/Kaufangaben werden nicht in die strukturierte Planfassung kopiert.
+
+Eine explizite Wochenphase hat Vorrang. Fehlt sie, wird nur ein eindeutiger
+Phasenbegriff Base/Build/Peak/Taper/Recovery aus dem Plantitel übernommen.
+Fehlende Phasen, unbekannte Sportarten oder unbekannte Distanzeinheiten werden
+als unsicher markiert. TSS, Schwimmdauer, Startdatum und prozentuale
+Durchschnittsintensitäten werden nicht aus Trainingsschritten erfunden.
+
+Nach dem ersten Codeupdate die Anwendung mit `./fitness-ai.sh restart` neu
+starten. Spätere Planimporte werden bei der nächsten Analyse eingelesen;
+ein Neustart pro Import ist nicht erforderlich. Im Dashboard bei Bedarf
+Plan, Startdatum der Planwoche 1 und Gültigkeitsende manuell zuordnen, wenn
+ähnliche Varianten keine eindeutige Erkennung zulassen. Der lokale Archivimport
+verändert niemals den Intervals-Kalender. Einheiten müssen dort weiterhin mit
+dem vorhandenen Converter eingeplant werden.
+
+## Eigenes Archivformat
+
 Minimales JSON (synthetisches Beispiel):
 
 ```json
@@ -68,6 +127,8 @@ oder direkt nach `structured/` zurückgesichert werden. Ein ungültiger Plan
 wird nicht gespeichert; ein archiviertes Original bleibt zur Prüfung erhalten.
 
 Manuelle Korrekturen sind im Dashboard über Plan und Gültigkeitszeitraum möglich.
-Dort wird das Startdatum der Planwoche 1 verwendet; der Zeitraum legt zugleich
+Das Formular zeigt gespeicherte Angaben wieder an. Alternativ kann die aktuelle
+Planwoche eingegeben werden, um den Planstart und das Enddatum vorzuschlagen.
+Dort wird das Startdatum der Planwoche 1 (Montag) verwendet; der Zeitraum legt zugleich
 die Gültigkeit dieser Zuordnung fest. Einzelne Sessions lassen sich im
 strukturierten JSON oder per `PUT /analyst/plans` korrigieren.

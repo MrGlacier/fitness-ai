@@ -67,6 +67,7 @@ fitness_agent = FitnessAgent(
     llm_client_instance=llm_client,
     mcp_client_instance=mcp_client,
     analyzer=_analyzer,
+    plan_context_provider=lambda: training_analyst.local_plan_context(),
 )
 
 
@@ -537,7 +538,8 @@ def analyst_assign_plan(assignment: PlanAssignment):
         training_analyst.store.save_assignment(assignment)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    return assignment
+    context = training_analyst.local_plan_context()
+    return {"assignment": assignment.model_dump(mode="json"), "plan": context["recognition"], "plan_context": context}
 
 
 @app.put("/analyst/races")
@@ -548,3 +550,41 @@ def analyst_save_race(race: Race):
             race = race.model_copy(update={"id": existing["id"]})
             break
     return training_analyst.store.save_race(race)
+
+
+# Historical comparisons reuse the analyst archive and existing Intervals client.
+from fitness.history import HistoricalAnalysis
+from fitness.history_models import HistoricalAssignment, HistoricalPreparation, HistoryComparison
+
+historical_analysis = HistoricalAnalysis(intervals_client_instance, training_analyst.store)
+
+
+@app.post("/analyst/history/compare")
+def historical_compare(payload: HistoryComparison):
+    return historical_analysis.compare(payload)
+
+
+@app.get("/analyst/history/catalog")
+def historical_catalog():
+    return historical_analysis.catalog()
+
+
+@app.put("/analyst/history/preparation")
+def historical_preparation(payload: HistoricalPreparation):
+    return historical_analysis.save_preparation(payload)
+
+
+@app.put("/analyst/history/assignment")
+def historical_assignment(payload: HistoricalAssignment):
+    try:
+        return historical_analysis.save_assignment(payload)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/analyst/history/pair")
+def historical_pair(a_id: str, b_id: str):
+    try:
+        return historical_analysis.session_pair(a_id, b_id)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc

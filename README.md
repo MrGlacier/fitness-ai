@@ -307,7 +307,8 @@ Das Dashboard zeigt Wettkampfziele, aktuelle Planwoche, Soll/Ist, Fitnessverlauf
 mit Kalenderszenario, Planfortschritt und einen nachvollziehbaren Vorbereitungsindex (0–100 %, keine
 Zielerreichungswahrscheinlichkeit).
 
-- [Architektur, Modelle und Grenzen](docs/analyst.md)
+- [Bedienungsanleitung mit Vergleichsbeispiel](docs/analyst.md)
+- [Architektur, Modelle und Grenzen](docs/analyst-technical.md)
 - [Trainingspläne ablegen, importieren und sichern](training_plans/README.md)
 
 Nach dem Update API/MCP neu starten und Dashboard neu bauen:
@@ -316,8 +317,11 @@ Nach dem Update API/MCP neu starten und Dashboard neu bauen:
 docker compose up -d --build dashboard
 ```
 
-Eigene Pläne nach `training_plans/originals/` legen und über
-`uv run python -m fitness.import_plan /pfad/plan.json` importieren.
+Eigene Pläne mit `uv run python -m fitness.import_plan /pfad/plan.json`
+importieren; Originale werden automatisch archiviert. Dan-Lorang-Originalexporte
+werden direkt erkannt. Ein ganzer Ordner lässt sich mit
+`uv run python -m fitness.import_plan /pfad/Trainingspläne --pattern 'TC*.json'`
+importieren; `--dry-run` prüft vorher ohne Schreibzugriffe.
 Lokale Wettkämpfe/Ziele und manuelle Planzuordnungen im Dashboard pflegen.
 PDF/ältere XLS erfordern eine geprüfte strukturierte Übertragung; einfache
 XLSX-, CSV-, JSON- und Markdown-Tabellen werden deterministisch eingelesen.

@@ -29,6 +29,10 @@ def recognize_plan(plans: list[TrainingPlan], events: list[dict], today: date,
     monday = today - timedelta(days=today.weekday())
     current = [e for e in events if monday.isoformat() <= e["date"] <= (monday + timedelta(days=6)).isoformat()]
     manual = [a for a in assignments if a["start_date"] <= today.isoformat() <= a["end_date"]]
+    selected = max(manual or assignments, key=lambda a: a.get("updated_at", a["start_date"]), default=None)
+    context = dict(assignments=list(assignments), selected_assignment=selected)
+    if manual:
+        manual = [selected]
     candidates = []
     for plan in plans:
         if manual and plan.id not in {a["plan_id"] for a in manual}:
@@ -73,12 +77,25 @@ def recognize_plan(plans: list[TrainingPlan], events: list[dict], today: date,
                                    score=score, evidence=sorted(set(reasons))))
     candidates.sort(key=lambda c: (-c["score"], c["plan_id"], c["week"]))
     if not candidates:
-        return {"status": "unavailable", "active": None, "candidates": [],
-                "observed_titles": [e["name"] for e in current[:10]]}
+        reason = "Noch keine Planzuordnung gespeichert. Plan und Start der Planwoche 1 festlegen."
+        if selected:
+            if selected["start_date"] > today.isoformat():
+                reason = "Die gespeicherte Zuordnung beginnt erst in der Zukunft."
+            elif selected["end_date"] < today.isoformat():
+                reason = "Die gespeicherte Zuordnung ist abgelaufen."
+            elif selected["plan_id"] not in {p.id for p in plans}:
+                reason = "Der zugeordnete Plan fehlt im lokalen Archiv."
+            else:
+                reason = "Das Startdatum liegt außerhalb der vorhandenen Planwochen. Bitte Start der Planwoche 1 prüfen."
+        return dict(status="unavailable", active=None, candidates=[], message=reason,
+                    observed_titles=[e["name"] for e in current[:10]], **context)
     ambiguous = len(candidates) > 1 and candidates[0]["score"] - candidates[1]["score"] < 2
     uncertain = candidates[0]["score"] < 3 or ambiguous
-    return {"status": "uncertain" if uncertain else "matched",
-            "active": None if uncertain else candidates[0], "candidates": candidates[:8]}
+    message = "Mehrere Planvarianten passen zum Kalender. Eine manuelle Zuordnung schafft Klarheit." if uncertain else "Plan aus dem Kalender erkannt."
+    if manual and not uncertain:
+        message = "Manuelle Zuordnung gespeichert und aktuell aktiv."
+    return dict(status="uncertain" if uncertain else "matched", active=None if uncertain else candidates[0],
+                candidates=candidates[:8], message=message, **context)
 
 
 def compare_sessions(events: list[dict], workouts: list, today: date) -> dict:
@@ -141,3 +158,19 @@ def compare_sessions(events: list[dict], workouts: list, today: date) -> dict:
                          evidence=match[1] if match else None))
     return {"sessions": rows, "unplanned_activity_ids": [w.id for w in workouts if w.id not in used],
             "note": "Unmatched means no reliable match; it does not prove a missed workout."}
+
+
+def build_plan_context(plans: list[TrainingPlan], recognition: dict) -> dict:
+    """Kompakte archivierte Wocheninhalte samt expliziter Herkunft für Dashboard und Chat."""
+    active = recognition.get("active")
+    plan = next((p for p in plans if active and p.id == active["plan_id"]), None)
+    if not plan:
+        return dict(status="unavailable", message=recognition.get("message"), sessions=[])
+    sessions = [s.model_dump(mode="json", exclude={"source_details"})
+                for s in plan.sessions if s.week == active["week"]]
+    for session in sessions:
+        session["description"] = session["description"][:600]
+        session["notes"] = session["notes"][:400]
+    return dict(status="available", source="local_plan_archive", plan_id=plan.id, name=plan.name,
+                week=active["week"], phases=active["phases"], description=plan.description[:600],
+                sessions=sessions, note="Archivvorgaben sind Trainingsabsichten. Der Intervals-Kalender bleibt führend für Termine und Soll/Ist.")
