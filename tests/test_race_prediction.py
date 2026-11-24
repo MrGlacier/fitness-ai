@@ -30,7 +30,7 @@ def workout(sport="Run", day=7, distance=15, seconds=5400, **changes):
 
 
 def training():
-    return [workout(sport, day, distance, seconds + day * 10)
+    return [workout(sport, day, distance, seconds + day * 10, is_race=True)
             for day in (5, 12, 19, 26)
             for sport, distance, seconds in [("Swim", 2, 2400), ("Ride", 75, 9000), ("Run", 15, 4500)]]
 
@@ -41,11 +41,12 @@ def test_total_goal_uses_actual_times_and_reacts_to_target_without_splits():
     b = predict_race(race(target_seconds=25000), data, TODAY)
     assert a["status"] == b["status"] == "estimated"
     assert a["estimate_seconds"] == b["estimate_seconds"]
-    assert a["score"] < b["score"]
+    assert 25 < a["score"] < b["score"] <= 100
+    assert a["goal_index"]["status"] == "heuristic"
     assert a["distances_km"] == {"Swim": 1.9, "Ride": 90, "Run": 21.1}
-    assert len(a["parts"]) == 3 and all(p["basis"] == "training" for p in a["parts"])
-    assert "Grobe" in a["data_quality"]
-    assert any("nicht deine Leistungsgrenze" in note for note in a["notes"])
+    assert len(a["parts"]) == 3 and all(p["basis"] == "race" for p in a["parts"])
+    assert "Aussagekraft" in a["data_quality"]
+    assert a["uncertainty_kind"] == "model_scenario"
     assert a == predict_race(race(target_seconds=17000), list(reversed(data)), TODAY)
 
 
@@ -73,7 +74,9 @@ def test_personal_exponent_is_estimated_only_from_actual_races():
     assert "Persönlicher" in p["parts"][0]["method"]
     for w in observations:
         w.is_race = False
-    assert predict_race(r, observations, TODAY)["parts"][0]["exponent"] == 1.07
+    fallback = predict_race(r, observations, TODAY)["parts"][0]
+    assert fallback["available"] and fallback["basis"] == "supporting_scenario"
+    assert fallback["exponent"] == 1.07
 
 
 def test_missing_discipline_does_not_invent_a_total_or_erase_other_estimates():
@@ -119,7 +122,7 @@ def test_plan_fulfillment_does_not_enter_goal_prediction():
 
 def test_single_extreme_training_outlier_does_not_determine_prediction():
     r = race(sport="Run", name="Example", distances_km={"Run": 15})
-    observations = [workout(day=d, distance=15, seconds=4500) for d in (5, 10, 15, 20, 25, 30)]
+    observations = [workout(day=d, distance=15, seconds=4500, is_race=True) for d in (5, 10, 15, 20, 25, 30)]
     before = predict_race(r, observations, TODAY)
     observations.append(workout(day=6, distance=15, seconds=15000))
     after = predict_race(r, observations, TODAY)
@@ -129,7 +132,7 @@ def test_single_extreme_training_outlier_does_not_determine_prediction():
 
 def test_trail_requires_course_elevation_and_comparable_terrain_evidence():
     r = race(sport="TrailRun", name="Example trail", distances_km={"Run": 30}, target_seconds=None)
-    runs = [workout(distance=20, seconds=9000, elevation_gain=1000)]
+    runs = [workout(distance=20, seconds=9000, elevation_gain=1000, is_race=True)]
     assert predict_race(r, runs, TODAY)["status"] == "partial"
     r["elevation_gain_m"] = 1500
     p = predict_race(r, runs, TODAY)
@@ -157,7 +160,7 @@ def test_outage_and_past_race_never_return_a_fresh_prediction():
 
 
 def test_stale_evidence_and_fallback_fatigue_are_disclosed():
-    runs = [workout(day=90, distance=15, seconds=4500)]
+    runs = [workout(day=90, distance=15, seconds=4500, is_race=True)]
     p = predict_race(race(sport="Run", name="Example", distances_km={"Run": 21.1}), runs, TODAY)
     assert p["parts"][0]["age_days"] == 90
     assert any("90 Tage" in n for n in p["parts"][0]["notes"])
@@ -167,10 +170,10 @@ def test_stale_evidence_and_fallback_fatigue_are_disclosed():
 def test_personal_brick_pairs_replace_the_generic_fatigue_assumption():
     observations = []
     for i, day in enumerate((5, 15, 25)):
-        run = workout(day=day, seconds=3600, distance=10, id=f"brick-{i}")
+        run = workout(day=day, seconds=3600, distance=10, id=f"brick-{i}", rpe=5)
         bike = workout(sport="Ride", day=day, seconds=3600, distance=30, id=f"bike-{i}",
-                       start_time=run.start_time-timedelta(seconds=3900))
-        standalone = workout(day=day+2, seconds=3300, distance=10, id=f"standalone-{i}")
+                       start_time=run.start_time-timedelta(seconds=3900), avg_watts=150, ftp=220, rpe=5)
+        standalone = workout(day=day+2, seconds=3300, distance=10, id=f"standalone-{i}", rpe=5)
         observations.extend([run, bike, standalone])
     factors, note = _fatigue_scenarios(observations, TODAY)
     assert all(isclose(v, 3600/3300-1) for v in factors)
@@ -197,10 +200,10 @@ def test_dashboard_renders_real_target_comparison_and_local_ai_button():
     summary = dict(races=[r], next_race=r, days_to_race=100, goal_predictions={r["id"]: p})
     with patch.object(routes, "_safe_summary", return_value={}), patch.object(routes, "_safe_analyst", return_value=summary):
         html = routes.dashboard_index(DashboardRouteTests._request()).body.decode()
-    assert "Geschätzte Zeitspanne" in html and "Dein Ziel im Zeitvergleich" in html
-    assert 'aria-label="Zeitvergleich: Wunschzeit' in html
-    assert 'geschätzte Mitte' in html
-    assert "Grobe Schätzung aus Training" in html
+    assert "Aktuelle Wettkampfprognose" in html and "Zielerreichungsindex" in html
+    assert "confidence-dial" in html and "Zielzeit realistisch erreichbar" in html
+    assert "Zentrale Schätzung" in html
+    assert "Aussagekraft" in html
     assert "Von meiner lokalen KI erklären lassen" in html
     assert "goal_predictions" in html and "keine Prozentchance" in html
     assert "70.3" in html

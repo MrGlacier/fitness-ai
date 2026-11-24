@@ -437,6 +437,12 @@ class IntervalsClient:
             average_cadence = round(average_cadence, 1) if average_cadence is not None else None,
             elevation_gain = round(elevation_gain, 1) if elevation_gain is not None else None,
             decoupling = round(decoupling, 2) if decoupling is not None else None,
+            avg_watts = _nonnegative_number(activity.get("icu_average_watts")),
+            ftp = _nonnegative_number(activity.get("icu_ftp")),
+            threshold_speed_mps = _nonnegative_number(activity.get("threshold_pace")),
+            lthr = _nonnegative_number(activity.get("lthr")),
+            weight_kg = _nonnegative_number(activity.get("icu_weight")),
+            splits = self._map_intervals_to_workout_splits(activity.get("icu_intervals") or []),
             weighted_avg_watts = round(weighted_avg_watts, 1) if weighted_avg_watts is not None else None,
             rpe = activity.get("icu_rpe"),
             comment = activity.get("description"),
@@ -471,6 +477,7 @@ class IntervalsClient:
             splits.append(
                 WorkoutSplit(
                     index=index,
+                    active_time_available=interval.get("moving_time") is not None,
                     label=interval.get("label"),
                     split_type=interval.get("type"),
                     distance_km=distance_km,
@@ -715,6 +722,9 @@ class IntervalsClient:
                                 hrv=_nonnegative_number(row.get("hrv")),
                                 resting_hr=_nonnegative_number(row.get("restingHR")),
                                 sleep_secs=_nonnegative_number(row.get("sleepSecs")),
+                                sleep_quality=_nonnegative_number(row.get("sleepQuality")),
+                                sleep_score=_nonnegative_number(row.get("sleepScore")),
+                                readiness=_nonnegative_number(row.get("readiness")),
                                 tsb=ctl-atl if ctl is not None and atl is not None else None))
         return results
 

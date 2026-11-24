@@ -1,26 +1,37 @@
 {% from 'confidence_gauge.html' import confidence_gauge %}
 {% macro goal_prediction(prediction, race, compact=false) %}
 <div class="goal-prediction">
-  <div class="prediction-overview {{ 'prediction-overview--with-dial' if prediction.get('score') is not none else '' }}">
-  {% if prediction.get('score') is not none %}{{ confidence_gauge(prediction, compact=compact, time_scale=true) }}{% endif %}
+  <div class="prediction-overview prediction-overview--with-dial">
+  {{ confidence_gauge(prediction, compact=compact, time_scale=false) }}
   <div class="prediction-summary">
   {% if prediction.get('estimate_seconds') is not none %}
   <span class="prediction-quality">{{ prediction.data_quality }}</span>
-  <p class="prediction-time"><span>Geschätzte Zeitspanne</span><strong>{{ prediction.faster_seconds|format_duration_short }} – {{ prediction.slower_seconds|format_duration_short }}</strong></p>
+  <p class="prediction-time"><span>Aktuelle Wettkampfprognose · Szenariospanne</span><strong>{{ prediction.faster_seconds|format_duration_short }} – {{ prediction.slower_seconds|format_duration_short }}</strong></p>
   {% if race.target_seconds %}<p class="prediction-target">Deine Wunschzeit <strong>{{ race.target_seconds|format_duration }}</strong></p>{% endif %}
-  <p class="prediction-verdict">{{ prediction.verdict }}</p>
+  <p class="helper">Zentrale Schätzung: <strong>{{ prediction.estimate_seconds|format_duration_short }}</strong></p>
+  <p class="prediction-verdict">{{ prediction.get('assessment', prediction.verdict) }}</p>
   {% if prediction.get('target_gap_seconds') is not none %}<p class="helper">{{ (prediction.target_gap_seconds|abs)|format_duration_short }} {{ 'schneller' if prediction.target_gap_seconds < 0 else 'langsamer' }} als die geschätzte Mitte.</p>{% endif %}
   <p class="helper">{{ 'Trainingstempo zeigt nicht dein Rennlimit.' if prediction.data_quality == 'Grobe Schätzung aus Training' else 'Eine Schätzung, keine Renngarantie.' }}</p>
   <div class="prediction-flags">{% for part in prediction.get('parts', []) %}{% if part.get('age_days', 0) > 42 %}<span>{{ part.label }}: Nachweis {{ part.age_days }} Tage alt</span>{% endif %}{% endfor %}</div>
   {% else %}<h3>Zeitvergleich noch offen</h3>{% for note in prediction.get('notes', []) %}<p class="helper">{{ note }}</p>{% else %}<p class="helper">Der Zeitvergleich wird nach dem Laden der Analyse angezeigt.</p>{% endfor %}{% endif %}
+  <p class="helper">Veränderung zur Vorwoche: {% if prediction.get('weekly_change') is not none %}{{ '%+d'|format(prediction.weekly_change) }} Punkte{% else %}Noch kein vergleichbarer Wochenstand{% endif %}</p>
+  {% if prediction.get('race_day_forecast', {}).get('estimate_seconds') %}<p class="prediction-time"><span>Prognose zum Wettkampftag</span><strong>{{ prediction.race_day_forecast.estimate_seconds|format_duration_short }}</strong></p><p class="helper">{{ prediction.race_day_forecast.faster_seconds|format_duration_short }} – {{ prediction.race_day_forecast.slower_seconds|format_duration_short }}</p>{% endif %}
   </div></div>
+  <div class="prediction-flags">{% for part in prediction.get('parts', []) %}<span>{{ part.label }}: {% if part.available %}{{ part.estimate_seconds|format_duration_short }}{% else %}Noch nicht belastbar bewertbar{% endif %}</span>{% endfor %}</div>
+  {% for part in prediction.get('parts', []) %}{% if part.get('assessment') %}<p class="helper"><strong>{{ part.label }}:</strong> {{ part.assessment }}</p>{% endif %}{% endfor %}
+  {% if prediction.get('transition_seconds') is not none %}<p class="helper">Wechsel gesamt: {{ prediction.transition_seconds|format_duration }}</p>{% endif %}
+  {% for factor in prediction.get('uncertainty_factors', []) %}<p class="helper">{{ factor }}</p>{% endfor %}
   <details class="subtle-details prediction-notes"><summary>Hinweise & Annahmen</summary>
-    <p class="helper">In der Mitte der Uhr steht die geschätzte Zeit. Der Zeiger zeigt deine Wunschzeit: links anspruchsvoller, rechts mehr Zeitreserve. Außerhalb der Spanne bleibt er am Rand. Grün bedeutet keine Garantie.</p>
+    <p class="helper">Der Zielerreichungsindex bewertet zuerst die Ausdauer für ein Finish, dann Zielzeit und Leistungsreserven am Wettkampftag. Er ist keine Erfolgswahrscheinlichkeit. 0–25: Finish gefährdet · 26–49: Finish möglich · 50–64: Zielzeit ambitioniert · 65–74: Zielzeit in Reichweite · 75–89: Zielzeit realistisch erreichbar · 90–99: Zielzeit sehr gut erreichbar · 100: Leistungsreserven vorhanden.</p>
     <p class="helper">Die Spanne entsteht aus Trainings-/Wettkampfvergleichen und Modellannahmen. Sie ist kein zugesicherter Zeitbereich.</p>
     {% if prediction.get('phase_note') %}<p class="helper">{{ prediction.phase_note }}</p>{% endif %}
     {% if prediction.get('estimate_seconds') is not none %}{% for note in prediction.get('notes', []) %}<p class="helper">{{ note }}</p>{% endfor %}{% endif %}
     {% for assumption in prediction.get('assumptions', []) %}<p class="helper">Annahme: {{ assumption }}</p>{% endfor %}
   </details>
+  <details class="subtle-details"><summary>Fitnessentwicklung</summary>{% if prediction.get('race_day_forecast') %}<p class="helper">{{ prediction.race_day_forecast.reason }}</p>{% endif %}
+  {% if prediction.get('recovery_context') %}<p class="helper">{{ prediction.recovery_context.note }}</p>{% endif %}
+  {% if prediction.get('context_analysis') %}<p class="helper">Lokale KI: {{ 'Kontext analysiert' if prediction.context_analysis.status == 'analyzed' else 'derzeit nicht verfügbar' }}</p>{% for item in prediction.context_analysis.get('interpretations', []) %}<p class="helper">{{ item.explanation }} · Beleg: „{{ item.quote }}“</p>{% endfor %}{% endif %}<p class="helper">{{ prediction.get('fitness_development', {}).get('note', 'Noch keine vergleichbaren Verlaufsdaten.') }}</p>
+  {% for point in prediction.get('fitness_development', {}).get('points', [])[-12:] %}<p class="helper">{{ point.date }} · {{ point.sport }} · {{ point.metric }}: {{ point.value }}</p>{% endfor %}</details>
   <details class="subtle-details"><summary>So entsteht die Zeit-Einschätzung</summary>
     {% if prediction.get('score_explanation') %}<p>{{ prediction.score_explanation }}</p>{% endif %}
     {% for part in prediction.get('parts', []) %}<h4>{{ part.label }} · {{ part.distance_km }} km</h4>
@@ -28,10 +39,12 @@
       {% if part.sport == 'Ride' %}<p>Übertragenes Tempo: {{ (3600 / part.seconds_per_km)|round(1) }} km/h</p>{% else %}<p>Übertragenes Tempo: {{ ((part.seconds_per_km / 10) if part.sport == 'Swim' else part.seconds_per_km)|format_duration }} / {{ '100 m' if part.sport == 'Swim' else 'km' }}</p>{% endif %}
       <div class="table-wrapper"><table class="workout-table"><thead><tr><th>Nachweis</th><th>Distanz</th><th>Verwendete Zeit</th><th>RPE</th></tr></thead><tbody>{% for w in part.evidence %}<tr><td>{{ w.date }} · {{ w.id }}</td><td>{{ w.distance_km|round(2) }} km</td><td>{{ w.duration_sec|format_duration }} · {{ w.time_basis }}</td><td>{{ w.rpe if w.rpe is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div>
       {% else %}<p>{{ part.reason }}</p>{% endif %}
+      {% if part.get('fresh_estimate_seconds') %}<p class="helper">Frischer Lauf: {{ part.fresh_estimate_seconds|format_duration_short }} · nach Radvorbelastung: {{ part.triathlon_estimate_seconds|format_duration_short }}</p>{% endif %}
+      <details><summary>Aktivitäten und Auswahlgründe</summary>{% for row in part.get('activity_audit', []) %}<p class="helper">{{ row.date }} · {{ row.name }} · {{ row.id }} · {{ row.training_type }} · {{ row.role }} · Gewicht {{ row.weight }} · Qualität {{ row.data_quality }}: {{ row.reason }}</p>{% for section in row.sections %}<p class="helper">Abschnitt {{ section.index }}: {{ section.distance_km }} km · {{ section.duration_sec }} s aktive Zeit</p>{% endfor %}{% for section in row.get('excluded_sections', []) %}<p class="helper">Abschnitt {{ section.index }}: {{ section.reason }}</p>{% endfor %}{% endfor %}</details>
       {% for note in part.get('notes', []) %}<p class="helper">{{ note }}</p>{% endfor %}
       {% if part.excluded %}<details><summary>Warum andere Einheiten nicht verwendet werden</summary>{% for reason, count in part.excluded.items() %}<p>{{ count }} × {{ reason }}</p>{% endfor %}</details>{% endif %}
     {% endfor %}
-    <h4>Wissenschaftliche Grundlagen</h4><p class="helper">Die Lauf-Hochrechnung nutzt veröffentlichte Distanz-Zeit-Modelle. Die kombinierte Triathlon-Schätzung und die Uhr sind eigene, noch nicht wissenschaftlich geprüfte Auswertungen. Die Quellen bestätigen keine persönliche Erfolgsquote.</p>
+    <h4>Wissenschaftliche Grundlagen</h4><p class="helper">Die Lauf-Hochrechnung nutzt veröffentlichte Distanz-Zeit-Modelle. Die kombinierte Triathlon-Schätzung und der Zielindex sind eigene, noch nicht wissenschaftlich geprüfte Auswertungen. Die Quellen bestätigen keine persönliche Erfolgsquote.</p>
     {% for source in prediction.get('sources', []) %}<p><a class="text-link" href="{{ source.url }}" target="_blank" rel="noopener noreferrer">{{ source.title }}</a></p>{% endfor %}
   </details>
   <form method="post" action="/dashboard/chat"><input type="hidden" name="question" value="Erkläre die Zielzeit-Einschätzung für race_id {{ race.id }} in einfachen Worten. Lade get_training_analysis mit section predictions und nutze goal_predictions. Welche Zeitspanne ergibt sich, wie passt meine Wunschzeit dazu und welche Nachweise und Annahmen begrenzen die Aussage? Erfinde keine Zahlen."><button type="submit" class="secondary">Von meiner lokalen KI erklären lassen</button></form>

@@ -121,7 +121,7 @@ def get_training_analysis(section: str = "overview") -> dict:
         result["race_preparation"] = {key: dict(value, history=value["history"][-12:])
                                       for key, value in data["race_preparation"].items()}
     if section in {"races", "predictions"}:
-        result["goal_predictions"] = {key: dict(value, parts=[dict(part, evidence=part["evidence"][-5:])
+        result["goal_predictions"] = {key: dict(value, fitness_development=dict(value.get("fitness_development", {}), points=value.get("fitness_development", {}).get("points", [])[-12:]), parts=[dict(part, evidence=part["evidence"][-5:], activity_audit=part.get("activity_audit", [])[-5:])
                                                               for part in value["parts"]])
                                       for key, value in data["goal_predictions"].items()}
     return result

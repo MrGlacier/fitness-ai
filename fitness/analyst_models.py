@@ -58,6 +58,7 @@ class Race(AnalystModel):
     status: Literal["planned", "completed", "cancelled"] = "planned"
     transition_seconds: float | None = Field(default=None, ge=0)
     elevation_gain_m: float | None = Field(default=None, ge=0)
+    cutoff_seconds: float | None = Field(default=None, gt=0)
 
     def model_post_init(self, context):
         if any(v <= 0 or not isfinite(v) for v in self.goal_splits_seconds.values()):

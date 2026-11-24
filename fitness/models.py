@@ -136,6 +136,7 @@ class TrainingTodayRecommendation(BaseModel):
 
 
 class WorkoutSplit(BaseModel):
+    active_time_available: bool = False
     index: int
     label: str | None = None
     split_type: str | None = None
@@ -169,6 +170,11 @@ class Workout(BaseModel):
     average_cadence: float | None = None
     elevation_gain: float | None = None
     decoupling: float | None = None
+    avg_watts: float | None = None
+    ftp: float | None = None
+    threshold_speed_mps: float | None = None
+    lthr: float | None = None
+    weight_kg: float | None = None
     weighted_avg_watts: float | None = None
     variability_index: float | None = None
     rpe: int | None = None

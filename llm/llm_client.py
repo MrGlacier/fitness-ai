@@ -41,6 +41,7 @@ class LlmClient:
         max_tokens: int | None = None,
         step_name: str = "LLM",
         timeout: float | httpx.Timeout | None = None,
+        response_schema: dict | None = None,
     ) -> dict:
         endpoint = llm_endpoints["completions"]
         post_data: dict = {
@@ -63,6 +64,8 @@ class LlmClient:
 
         if max_tokens is not None:
             post_data["max_tokens"] = max_tokens
+        if response_schema is not None:
+            post_data["response_format"] = {"type": "json_object", "schema": response_schema}
 
         answer = self._post(
             endpoint,

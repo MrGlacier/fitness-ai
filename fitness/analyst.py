@@ -1,20 +1,41 @@
 """Application orchestration, independent of the LLM and MCP transport."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 import json
+from hashlib import sha256
 
 from core.logger import logger
 from fitness.archive import AnalystStore
 from fitness.analyst_models import Race
-from fitness.plan_analysis import compare_sessions, normalized, recognize_plan, workout_date, build_plan_context
+from fitness.models import Workout, WorkoutSplit
+from fitness.plan_analysis import compare_sessions, sport_family, normalized, recognize_plan, workout_date, build_plan_context
 from fitness.projections import forecast_fitness
 from fitness.preparation import preparation_index
 from fitness.race_prediction import predict_race
+from fitness.prediction_context import analyze_context
 
 
 class TrainingAnalyst:
-    def __init__(self, client, store: AnalystStore | None = None):
+    def __init__(self, client, store: AnalystStore | None = None, context_llm=None):
         self.client = client
         self.store = store or AnalystStore()
+        self.context_llm = context_llm
+        self.prediction_namespace = sha256(str(getattr(client, 'athlete_id', '')).encode()).hexdigest()[:16]
+
+    def prediction_workouts(self, today: date) -> list:
+        """All available years, cached privately; no 180-day truncation."""
+        from intervals.intervals_client import IntervalsClient
+        if not isinstance(self.client, IntervalsClient):
+            return self.client.get_workouts(date(1970, 1, 1), today)
+        cache_kind = f'prediction-input-cache:{self.prediction_namespace}'
+        cached = self.store.records(cache_kind)
+        record = next((r for r in cached if r.get('as_of') == today.isoformat()), None)
+        if record and record.get('fetched_at') and (datetime.now(timezone.utc)-datetime.fromisoformat(record['fetched_at'])).total_seconds() < 600:
+            return [Workout.model_validate(w) for w in record['workouts']]
+        workouts = self.client.get_workouts(date(1970, 1, 1), today)
+        self.store.put(cache_kind, 'activities', dict(as_of=today.isoformat(),
+                       fetched_at=datetime.now(timezone.utc).isoformat(),
+                       workouts=[w.model_dump(mode='json') for w in workouts]))
+        return workouts
 
     def sync_races(self, events: list[dict]) -> list[dict]:
         races = self.store.records("race")
@@ -69,7 +90,29 @@ class TrainingAnalyst:
 
         start = today - timedelta(days=56)
         events = load("calendar", lambda: self.client.get_calendar(start, today + timedelta(days=365)), [])
-        workouts = load("activities", lambda: self.client.get_workouts(today - timedelta(days=180), today), [])
+        workouts = load("activities", lambda: self.prediction_workouts(today), [])
+        # Fetch actual lap metadata, never arbitrary stream chunks as swim intervals.
+        swims = sorted([w for w in workouts if sport_family(w.sport) == 'Swim' and workout_date(w) <= today],
+                       key=lambda w: (workout_date(w), w.id), reverse=True)
+        for workout in swims[:16]:
+            if not workout.splits:
+                def swim_detail(w=workout):
+                    kind = f'prediction-swim-detail:{self.prediction_namespace}'
+                    with self.store.connect() as db:
+                        row = db.execute('SELECT body FROM records WHERE kind=? AND id=?', (kind, w.id)).fetchone()
+                    if row:
+                        cached = json.loads(row[0])
+                        if cached.get('fetched_at') and (datetime.now(timezone.utc)-datetime.fromisoformat(cached['fetched_at'])).total_seconds() < 600:
+                            return cached['data']
+                    value = self.client.get_historical_session_details(w.id)
+                    if isinstance(value, dict):
+                        # Validate before persisting a response; bad optional laps must not break the dashboard.
+                        [WorkoutSplit.model_validate(part) for part in value.get('intervals', [])]
+                        self.store.put(kind, w.id, dict(data=value, fetched_at=datetime.now(timezone.utc).isoformat()))
+                    return value
+                details = load("swim details", swim_detail, {})
+                if isinstance(details, dict):
+                    workout.splits = load('swim details', lambda: [WorkoutSplit.model_validate(row) for row in details.get("intervals", [])], [])
         history = load("wellness", lambda: self.client.get_wellness_history(start, today), [])
         history = sorted([r for r in history if r["date"] <= today.isoformat()], key=lambda r: r["date"])
         local_races = load("local races", lambda: self.store.records("race"), [])
@@ -81,7 +124,7 @@ class TrainingAnalyst:
         training = [e for e in events if e["category"] in {"WORKOUT", "RACE_A", "RACE_B", "RACE_C"}]
         monday = today - timedelta(days=today.weekday())
         week_end = monday + timedelta(days=6)
-        comparison = compare_sessions(training, workouts, today)
+        comparison = compare_sessions(training, [w for w in workouts if start-timedelta(days=3) <= workout_date(w) <= today], today)
         week_rows = [r for r in comparison["sessions"] if monday.isoformat() <= r["event"]["date"] <= week_end.isoformat()]
         week_workouts = [w for w in workouts if monday <= workout_date(w) <= week_end]
         week_events = [r["event"] for r in week_rows]
@@ -149,6 +192,25 @@ class TrainingAnalyst:
         trend = {"ctl_delta": round(valid[-1]["ctl"] - valid[0]["ctl"], 2),
                  "atl_delta": round(valid[-1]["atl"] - valid[0]["atl"], 2),
                  "from": valid[0]["date"], "to": valid[-1]["date"]} if len(valid) >= 2 else None
+        from intervals.intervals_client import IntervalsClient
+        plan_context = build_plan_context(plans, recognition)
+        context = (analyze_context(workouts, today, plan_context, history, self.store, self.context_llm)
+                   if self.context_llm is not None or isinstance(self.client, IntervalsClient)
+                   else dict(status='unavailable', reason='Keine lokale KI für diesen Client konfiguriert.'))
+        linked = {row['activity_id']: row['event'] for row in comparison['sessions'] if row.get('activity_id')}
+        predictions = {}
+        for race in races:
+            prediction = predict_race(race, workouts, today, errors, planned=linked, context=context, wellness=history)
+            snapshots = self.store.records(f"prediction-snapshot:{race['id']}")
+            previous = [p for p in snapshots if (today-timedelta(days=10)).isoformat() <= p['as_of'] <= (today-timedelta(days=7)).isoformat()
+                        and p.get('target_seconds') == race.get('target_seconds')
+                        and p.get('model_version') == prediction['model_version']
+                        and p.get('score') is not None]
+            prediction['weekly_change'] = (prediction['score']-max(previous, key=lambda p: p['as_of'])['score']
+                                           if previous and prediction['score'] is not None else None)
+            if prediction['status'] == 'estimated' and not errors:
+                self.store.put(f"prediction-snapshot:{race['id']}", today.isoformat(), prediction)
+            predictions[race['id']] = prediction
         return dict(date=today.isoformat(), errors=errors, races=races, next_race=next_race,
                     days_to_race=(date.fromisoformat(next_race["date"]) - today).days if next_race else None,
                     plan=recognition, plan_context=build_plan_context(plans, recognition),
@@ -162,4 +224,4 @@ class TrainingAnalyst:
                               intensity_duration_sec=intensity),
                     comparison=comparison, weekly_comparison=weekly, fitness_history=history,
                     fitness_trend=trend, fitness_forecast=projection, race_preparation=preparation,
-                    goal_predictions={race["id"]: predict_race(race, workouts, today, errors) for race in races})
+                    goal_predictions=predictions)

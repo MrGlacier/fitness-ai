@@ -204,7 +204,7 @@ templates.env.filters["tss_color_class"] = _tss_color_class
 
 def _safe_analyst() -> dict:
     try:
-        response = _api_client.get("/analyst/summary")
+        response = _api_client.get("/analyst/summary", timeout=90.0)
         response.raise_for_status()
         return response.json()
     except Exception:
@@ -250,7 +250,7 @@ def _gauge_geometry(value: float | None) -> dict:
         return {}
     score = max(0, min(100, value))
     angle = radians(135 + score * 2.7)
-    color = "#fa7182" if score < 25 else "#ffa45c" if score < 50 else "#e5ca58" if score < 75 else "#68d98b"
+    color = "#fa7182" if score <= 25 else "#ffa45c" if score < 50 else "#e5ca58" if score < 65 else "#bedb62" if score < 75 else "#68d98b"
     return dict(x=round(110 + 78 * cos(angle), 2), y=round(110 + 78 * sin(angle), 2), color=color)
 
 
